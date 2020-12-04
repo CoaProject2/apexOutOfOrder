@@ -799,7 +799,7 @@ void APEX_cpu_run(APEX_CPU *cpu)
             printf("Clock Cycle #: %d\n", cpu->clock);
             printf("--------------------------------------------\n");
         }
-        APEX_mul1(cpu);
+        APEX_jbu2(cpu);
         APEX_jbu1(cpu);
         APEX_mul3(cpu);
         APEX_mul2(cpu);
