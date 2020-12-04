@@ -106,6 +106,17 @@ print_instruction(const CPU_Stage *stage)
         printf("%s", stage->opcode_str);
         break;
     }
+    case OPCODE_JUMP:
+    {
+        printf("%s,R%d,#%d ", stage->opcode_str, stage->rs1, stage->imm);
+        break;
+    }
+    case OPCODE_JAL:
+    {
+        printf("%s,R%d,R%d,#%d ", stage->opcode_str, stage->rd, stage->rs1,
+               stage->imm);
+        break;
+    }
     }
 }
 /* Debug function which prints the CPU stage content
@@ -292,6 +303,12 @@ APEX_decode(APEX_CPU *cpu)
                     iq_entry->fu_type = 4;
                     break;
                 }
+                case OPCODE_JUMP:
+                case OPCODE_JAL:
+                {
+                    iq_entry->fu_type = 5;
+                    break;
+                }
                 }
             }
         }
@@ -328,7 +345,7 @@ APEX_issuequeue(APEX_CPU *cpu)
 
     IQ_ENTRY selectedintfuiqentry;
     IQ_ENTRY selectedmulfuiqentry;
-    // IQ_ENTRY selectedbranchfuiqentry;
+    IQ_ENTRY selectedbranchfuiqentry;
 
     for (int i = 0; i < 24; i++)
     {
@@ -370,6 +387,17 @@ APEX_issuequeue(APEX_CPU *cpu)
                 selectedmulfuiqentry = iqe;
                 //   selectedinstpc = iqe.pc;
                 mulfuissued = issuequequeindex;
+                break;
+            }
+        }
+        case OPCODE_JUMP:
+        case OPCODE_JAL:
+        {
+            if (iqe.src1_ready == 1)
+            {
+                selectedbranchfuiqentry = iqe;
+                //   selectedinstpc = iqe.pc;
+                branchfuissued = issuequequeindex;
                 break;
             }
         }
@@ -418,9 +446,13 @@ APEX_issuequeue(APEX_CPU *cpu)
     }
     if (branchfuissued > -1)
     {
-        //  IQ_ENTRY entry = selectedmulfuiqentry;
+        IQ_ENTRY entry = selectedbranchfuiqentry;
+        entry.finishedstage = IQ;
+        cpu->jbu1.iq_entry = entry;
+        cpu->jbu1.stalled = 0;
+        cpu->jbu1.has_insn = TRUE;
+
         cpu->freeiq[branchfuissued] = 0;
-        //entry.finishedstage = IQ;
     }
 }
 
@@ -635,6 +667,7 @@ APEX_intfu(APEX_CPU *cpu)
             printf("\n");
 
             printf("%-15s: pc(%d) ", "intfu", iq_entry.pc);
+            print_stage_content("Instruction at intfu____________Stage--->", &cpu->intfu);
             printf("\n");
         }
     }
@@ -657,6 +690,7 @@ int APEX_mul1(APEX_CPU *cpu)
         if (ENABLE_DEBUG_MESSAGES)
         {
             printf("Instruction at mul1____________Stage--->");
+            print_stage_content("Instruction at mul1____________Stage--->", &cpu->mul1);
             printf("\n");
 
             printf("%-15s: pc(%d) ", "mul1", iq_entry.pc);
@@ -681,6 +715,7 @@ int APEX_mul2(APEX_CPU *cpu)
         if (ENABLE_DEBUG_MESSAGES)
         {
             printf("Instruction at mul2____________Stage--->");
+            print_stage_content("Instruction at mul2--->", &cpu->mul2);
             printf("\n");
 
             printf("%-15s: pc(%d) ", "mul2", iq_entry.pc);
@@ -706,6 +741,7 @@ int APEX_mul3(APEX_CPU *cpu)
         if (ENABLE_DEBUG_MESSAGES)
         {
             printf("Instruction at mul3____________Stage--->");
+            print_stage_content("Instruction at mul3____________Stage--->", &cpu->mul3);
             printf("\n");
 
             printf("%-15s: pc(%d) ", "mul3", iq_entry.pc);
@@ -716,10 +752,62 @@ int APEX_mul3(APEX_CPU *cpu)
 }
 int APEX_jbu1(APEX_CPU *cpu)
 {
+    if (cpu->jbu1.has_insn)
+    {
+        IQ_ENTRY iq_entry = cpu->jbu1.iq_entry;
+        switch (iq_entry.opcode)
+        {
+        case OPCODE_JAL:
+        {
+            cpu->jbu1.result_buffer = iq_entry.src1 + iq_entry.imm;
+            cpu->jbu1.rd = iq_entry.pc + 4;
+        }
+        case OPCODE_JUMP:
+        {
+            cpu->jbu1.result_buffer = iq_entry.src1 + iq_entry.imm;
+        }
+        }
+        cpu->jbu2 = cpu->jbu1;
+        cpu->jbu1.has_insn = FALSE;
+
+        if (ENABLE_DEBUG_MESSAGES)
+        {
+            printf("Instruction at jbu1--->");
+            printf("\n");
+
+            printf("%-15s: pc(%d) ", "jbu1", iq_entry.pc);
+            print_stage_content("Instruction at jbu1____________Stage--->", &cpu->jbu1);
+            printf("\n");
+        }
+    }
     return 0;
 }
 int APEX_jbu2(APEX_CPU *cpu)
 {
+    if (cpu->jbu2.has_insn)
+    {
+        IQ_ENTRY iq_entry = cpu->jbu2.iq_entry;
+        switch (iq_entry.opcode)
+        {
+        case OPCODE_JAL:
+        {
+        }
+        case OPCODE_JUMP:
+        {
+        }
+        }
+        cpu->jbu2.has_insn = FALSE;
+
+        if (ENABLE_DEBUG_MESSAGES)
+        {
+            printf("Instruction at jbu2--->");
+            printf("\n");
+
+            printf("%-15s: pc(%d) ", "jbu2", iq_entry.pc);
+             print_stage_content("Instruction at jbu2____________Stage--->", &cpu->jbu2);
+            printf("\n");
+        }
+    }
     return 0;
 }
 /*

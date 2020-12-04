@@ -165,9 +165,9 @@ set_opcode_str(const char *opcode_str)
     {
         return OPCODE_JUMP;
     }
-    if (strcmp(opcode_str, "JALR") == 0)
+    if (strcmp(opcode_str, "JAL") == 0)
     {
-        return OPCODE_JALR;
+        return OPCODE_JAL;
     }
     assert(0 && "Invalid opcode");
     return 0;
@@ -285,10 +285,15 @@ create_APEX_instruction(APEX_Instruction *ins, char *buffer)
     }
     case OPCODE_JUMP:
     {
+        ins->rs1 = get_num_from_string(tokens[0]);
+        ins->imm = get_num_from_string(tokens[1]);
         break;
     }
-    case OPCODE_JALR:
+    case OPCODE_JAL:
     {
+        ins->rd = get_num_from_string(tokens[0]);
+        ins->rs1 = get_num_from_string(tokens[1]);
+        ins->imm = get_num_from_string(tokens[2]);
         break;
     }
     }
