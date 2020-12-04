@@ -23,17 +23,17 @@
 static int
 get_num_from_string(const char *buffer)
 {
-   char str[16];
-   int i, j = 0;
+    char str[16];
+    int i, j = 0;
 
-   for (i = 1; buffer[i] != '\0'; ++i)
-   {
-       str[j] = buffer[i];
-       j++;
-   }
-   str[j] = '\0';
+    for (i = 1; buffer[i] != '\0'; ++i)
+    {
+        str[j] = buffer[i];
+        j++;
+    }
+    str[j] = '\0';
 
-   return atoi(str);
+    return atoi(str);
 }
 static void
 split_opcode_from_insn_string(char *buffer, char tokens[2][128])
@@ -161,12 +161,17 @@ set_opcode_str(const char *opcode_str)
     {
         return OPCODE_NOP;
     }
-
+    if (strcmp(opcode_str, "JUMP") == 0)
+    {
+        return OPCODE_JUMP;
+    }
+    if (strcmp(opcode_str, "JALR") == 0)
+    {
+        return OPCODE_JALR;
+    }
     assert(0 && "Invalid opcode");
     return 0;
 }
-
-
 
 /*
  * This function is related to parsing input file
@@ -201,49 +206,91 @@ create_APEX_instruction(APEX_Instruction *ins, char *buffer)
 
     switch (ins->opcode)
     {
-        case OPCODE_ADD:
-        case OPCODE_SUB:
-        case OPCODE_MUL:
-        case OPCODE_DIV:
-        case OPCODE_AND:
-        case OPCODE_OR:
-        case OPCODE_XOR:
-        {
-            ins->rd = get_num_from_string(tokens[0]);
-            ins->rs1 = get_num_from_string(tokens[1]);
-            ins->rs2 = get_num_from_string(tokens[2]);
-            break;
-        }
+    case OPCODE_ADD:
+    case OPCODE_SUB:
+    case OPCODE_MUL:
+    case OPCODE_DIV:
+    case OPCODE_AND:
+    case OPCODE_OR:
+    case OPCODE_XOR:
+    {
+        ins->rd = get_num_from_string(tokens[0]);
+        ins->rs1 = get_num_from_string(tokens[1]);
+        ins->rs2 = get_num_from_string(tokens[2]);
+        break;
+    }
 
-        case OPCODE_MOVC:
-        {
-            ins->rd = get_num_from_string(tokens[0]);
-            ins->imm = get_num_from_string(tokens[1]);
-            break;
-        }
+    case OPCODE_MOVC:
+    {
+        ins->rd = get_num_from_string(tokens[0]);
+        ins->imm = get_num_from_string(tokens[1]);
+        break;
+    }
 
-        case OPCODE_LOAD:
-        {
-            ins->rd = get_num_from_string(tokens[0]);
-            ins->rs1 = get_num_from_string(tokens[1]);
-            ins->imm = get_num_from_string(tokens[2]);
-            break;
-        }
+    case OPCODE_LOAD:
+    {
+        ins->rd = get_num_from_string(tokens[0]);
+        ins->rs1 = get_num_from_string(tokens[1]);
+        ins->imm = get_num_from_string(tokens[2]);
+        break;
+    }
 
-        case OPCODE_STORE:
-        {
-            ins->rs1 = get_num_from_string(tokens[0]);
-            ins->rs2 = get_num_from_string(tokens[1]);
-            ins->imm = get_num_from_string(tokens[2]);
-            break;
-        }
+    case OPCODE_STORE:
+    {
+        ins->rs1 = get_num_from_string(tokens[0]);
+        ins->rs2 = get_num_from_string(tokens[1]);
+        ins->imm = get_num_from_string(tokens[2]);
+        break;
+    }
 
-        case OPCODE_BZ:
-        case OPCODE_BNZ:
-        {
-            ins->imm = get_num_from_string(tokens[0]);
-            break;
-        }
+    case OPCODE_BZ:
+    case OPCODE_BNZ:
+    {
+        ins->imm = get_num_from_string(tokens[0]);
+        break;
+    }
+
+    case OPCODE_ADDL:
+    case OPCODE_SUBL:
+    {
+
+        ins->rd = get_num_from_string(tokens[0]);
+        ins->rs1 = get_num_from_string(tokens[1]);
+        ins->imm = get_num_from_string(tokens[2]);
+        break;
+    }
+    case OPCODE_LDR:
+    {
+        ins->rd = get_num_from_string(tokens[0]);
+        ins->rs1 = get_num_from_string(tokens[1]);
+        ins->rs2 = get_num_from_string(tokens[2]);
+        break;
+    }
+    case OPCODE_STR:
+    {
+        ins->rd = get_num_from_string(tokens[0]);
+        ins->rs1 = get_num_from_string(tokens[1]);
+        ins->rs2 = get_num_from_string(tokens[2]);
+        break;
+    }
+    case OPCODE_CMP:
+    {
+        ins->rs1 = get_num_from_string(tokens[0]);
+        ins->rs2 = get_num_from_string(tokens[1]);
+        break;
+    }
+    case OPCODE_NOP:
+    {
+        break;
+    }
+    case OPCODE_JUMP:
+    {
+        break;
+    }
+    case OPCODE_JALR:
+    {
+        break;
+    }
     }
     /* Fill in rest of the instructions accordingly */
 }

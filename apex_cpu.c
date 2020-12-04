@@ -376,7 +376,6 @@ APEX_issuequeue(APEX_CPU *cpu)
         }
     }
 
-    
     if (ENABLE_DEBUG_MESSAGES)
     {
         printf("Instruction at issuequeue____________Stage--->");
@@ -414,13 +413,12 @@ APEX_issuequeue(APEX_CPU *cpu)
         cpu->mul1.iq_entry = entry;
         cpu->mul1.stalled = 0;
         cpu->mul1.has_insn = TRUE;
-        
+
         cpu->freeiq[mulfuissued] = 0;
-       
     }
     if (branchfuissued > -1)
     {
-      //  IQ_ENTRY entry = selectedmulfuiqentry;
+        //  IQ_ENTRY entry = selectedmulfuiqentry;
         cpu->freeiq[branchfuissued] = 0;
         //entry.finishedstage = IQ;
     }
@@ -432,7 +430,7 @@ APEX_intfu(APEX_CPU *cpu)
     IQ_ENTRY iq_entry = cpu->intfu.iq_entry;
 
     if (!cpu->intfu.stalled && iq_entry.finishedstage < INTFU && cpu->intfu.has_insn)
-      {
+    {
         switch (iq_entry.opcode)
         {
         case OPCODE_ADD:
@@ -446,7 +444,178 @@ APEX_intfu(APEX_CPU *cpu)
                 cpu->free_PR_list[iq_entry.des_phy_reg] = 0;
 
                 //   printf("Add %d    %d iq_entry.des_phy_reg]", cpu->phys_regs[iq_entry.des_phy_reg], iq_entry.des_phy_reg);
+                if (cpu->intfu.result_buffer == 0)
+                {
+                    cpu->zero_flag = TRUE;
+                }
+                else
+                {
+                    cpu->zero_flag = FALSE;
+                }
             }
+            break;
+        }
+        case OPCODE_SUB:
+        {
+            if (iq_entry.src1_ready == 1 && iq_entry.src2_ready == 1)
+            {
+                cpu->intfu.result_buffer = iq_entry.src1 - iq_entry.src2;
+                //instruction retriement process
+                cpu->phys_regs[iq_entry.des_phy_reg] = cpu->intfu.result_buffer;
+                //freethelist
+                cpu->free_PR_list[iq_entry.des_phy_reg] = 0;
+
+                printf("Add %d    %d iq_entry.des_phy_reg]", cpu->phys_regs[iq_entry.des_phy_reg], iq_entry.des_phy_reg);
+
+                if (cpu->intfu.result_buffer == 0)
+                {
+                    cpu->zero_flag = TRUE;
+                }
+                else
+                {
+                    cpu->zero_flag = FALSE;
+                }
+            }
+
+            break;
+        }
+        case OPCODE_ADDL:
+        {
+            if (iq_entry.src1_ready == 1)
+            {
+                cpu->intfu.result_buffer = iq_entry.src1 + iq_entry.imm;
+                //instruction retriement process
+                cpu->phys_regs[iq_entry.des_phy_reg] = cpu->intfu.result_buffer;
+                //freethelist
+                cpu->free_PR_list[iq_entry.des_phy_reg] = 0;
+
+                printf("Add %d    %d iq_entry.des_phy_reg]", cpu->phys_regs[iq_entry.des_phy_reg], iq_entry.des_phy_reg);
+
+                if (cpu->intfu.result_buffer == 0)
+                {
+                    cpu->zero_flag = TRUE;
+                }
+                else
+                {
+                    cpu->zero_flag = FALSE;
+                }
+            }
+
+            break;
+        }
+
+        case OPCODE_SUBL:
+        {
+            if (iq_entry.src1_ready == 1)
+            {
+                cpu->intfu.result_buffer = iq_entry.src1 - iq_entry.imm;
+                //instruction retriement process
+                cpu->phys_regs[iq_entry.des_phy_reg] = cpu->intfu.result_buffer;
+                //freethelist
+                cpu->free_PR_list[iq_entry.des_phy_reg] = 0;
+
+                printf("Add %d    %d iq_entry.des_phy_reg]", cpu->phys_regs[iq_entry.des_phy_reg], iq_entry.des_phy_reg);
+
+                if (cpu->intfu.result_buffer == 0)
+                {
+                    cpu->zero_flag = TRUE;
+                }
+                else
+                {
+                    cpu->zero_flag = FALSE;
+                }
+            }
+
+            break;
+        }
+        case OPCODE_AND:
+        {
+            if (iq_entry.src1_ready == 1 && iq_entry.src2_ready == 1)
+            {
+                cpu->intfu.result_buffer = iq_entry.src1 & iq_entry.src2;
+                //instruction retriement process
+                cpu->phys_regs[iq_entry.des_phy_reg] = cpu->intfu.result_buffer;
+                //freethelist
+                cpu->free_PR_list[iq_entry.des_phy_reg] = 0;
+
+                printf("Add %d    %d iq_entry.des_phy_reg]", cpu->phys_regs[iq_entry.des_phy_reg], iq_entry.des_phy_reg);
+
+                if (cpu->intfu.result_buffer == 0)
+                {
+                    cpu->zero_flag = TRUE;
+                }
+                else
+                {
+                    cpu->zero_flag = FALSE;
+                }
+            }
+
+            break;
+        }
+        case OPCODE_OR:
+        {
+            if (iq_entry.src1_ready == 1 && iq_entry.src2_ready == 1)
+            {
+                cpu->intfu.result_buffer = iq_entry.src1 | iq_entry.src2;
+                //instruction retriement process
+                cpu->phys_regs[iq_entry.des_phy_reg] = cpu->intfu.result_buffer;
+                //freethelist
+                cpu->free_PR_list[iq_entry.des_phy_reg] = 0;
+
+                printf("Add %d    %d iq_entry.des_phy_reg]", cpu->phys_regs[iq_entry.des_phy_reg], iq_entry.des_phy_reg);
+
+                if (cpu->intfu.result_buffer == 0)
+                {
+                    cpu->zero_flag = TRUE;
+                }
+                else
+                {
+                    cpu->zero_flag = FALSE;
+                }
+            }
+
+            break;
+        }
+        case OPCODE_XOR:
+        {
+            if (iq_entry.src1_ready == 1 && iq_entry.src2_ready == 1)
+            {
+                cpu->intfu.result_buffer = iq_entry.src1 ^ iq_entry.src2;
+                //instruction retriement process
+                cpu->phys_regs[iq_entry.des_phy_reg] = cpu->intfu.result_buffer;
+                //freethelist
+                cpu->free_PR_list[iq_entry.des_phy_reg] = 0;
+
+                printf("Add %d    %d iq_entry.des_phy_reg]", cpu->phys_regs[iq_entry.des_phy_reg], iq_entry.des_phy_reg);
+
+                if (cpu->intfu.result_buffer == 0)
+                {
+                    cpu->zero_flag = TRUE;
+                }
+                else
+                {
+                    cpu->zero_flag = FALSE;
+                }
+            }
+
+            break;
+        }
+        case OPCODE_CMP:
+        {
+            if (iq_entry.src1_ready == 1 && iq_entry.src2_ready == 1)
+            {
+                cpu->intfu.result_buffer = iq_entry.src1 - iq_entry.src2;
+
+                if (cpu->intfu.result_buffer == 0)
+                {
+                    cpu->zero_flag = TRUE;
+                }
+                else
+                {
+                    cpu->zero_flag = FALSE;
+                }
+            }
+
             break;
         }
         case OPCODE_MOVC:
@@ -456,11 +625,11 @@ APEX_intfu(APEX_CPU *cpu)
             //    printf("movc %d    %d iq_entry.des_phy_reg]", cpu->phys_regs[iq_entry.des_phy_reg], iq_entry.des_phy_reg);
 
             break;
-        } 
         }
-       iq_entry.finishedstage = INTFU; 
-       cpu->intfu.has_insn=FALSE;
-       if (ENABLE_DEBUG_MESSAGES)
+        }
+        iq_entry.finishedstage = INTFU;
+        cpu->intfu.has_insn = FALSE;
+        if (ENABLE_DEBUG_MESSAGES)
         {
             printf("Instruction at intfu____________Stage--->");
             printf("\n");
@@ -468,11 +637,8 @@ APEX_intfu(APEX_CPU *cpu)
             printf("%-15s: pc(%d) ", "intfu", iq_entry.pc);
             printf("\n");
         }
-        }
-
-        
     }
-
+}
 
 int APEX_mul1(APEX_CPU *cpu)
 {
@@ -485,20 +651,19 @@ int APEX_mul1(APEX_CPU *cpu)
             cpu->mul1.result_buffer = iq_entry.src1 * iq_entry.src2;
         }
         iq_entry.finishedstage = MUL1;
-    
+
         cpu->mul2 = cpu->mul1;
-        cpu->mul1.has_insn=FALSE;
-    if (ENABLE_DEBUG_MESSAGES)
-    {
-        printf("Instruction at mul1____________Stage--->");
-        printf("\n");
+        cpu->mul1.has_insn = FALSE;
+        if (ENABLE_DEBUG_MESSAGES)
+        {
+            printf("Instruction at mul1____________Stage--->");
+            printf("\n");
 
-        printf("%-15s: pc(%d) ", "mul1", iq_entry.pc);
-        printf("\n");
-    }
+            printf("%-15s: pc(%d) ", "mul1", iq_entry.pc);
+            printf("\n");
+        }
     }
 
-    
     return 0;
 }
 
@@ -506,22 +671,21 @@ int APEX_mul2(APEX_CPU *cpu)
 {
     IQ_ENTRY iq_entry = cpu->mul2.iq_entry;
 
-    if (!cpu->mul2.stalled &&  iq_entry.finishedstage < MUL2 && cpu->mul2.has_insn)
+    if (!cpu->mul2.stalled && iq_entry.finishedstage < MUL2 && cpu->mul2.has_insn)
     {
-    iq_entry.finishedstage = MUL2;
-    
+        iq_entry.finishedstage = MUL2;
+
         cpu->mul3 = cpu->mul2;
-        cpu->mul2.has_insn=FALSE;
-    
+        cpu->mul2.has_insn = FALSE;
 
-    if (ENABLE_DEBUG_MESSAGES)
-    {
-        printf("Instruction at mul2____________Stage--->" );
-        printf("\n");
+        if (ENABLE_DEBUG_MESSAGES)
+        {
+            printf("Instruction at mul2____________Stage--->");
+            printf("\n");
 
-        printf("%-15s: pc(%d) ", "mul2", iq_entry.pc);
-        printf("\n");
-    }
+            printf("%-15s: pc(%d) ", "mul2", iq_entry.pc);
+            printf("\n");
+        }
     }
     return 0;
 }
@@ -535,22 +699,29 @@ int APEX_mul3(APEX_CPU *cpu)
 
         cpu->phys_regs[iq_entry.des_phy_reg] = cpu->mul3.result_buffer;
         cpu->phys_regs_valid[iq_entry.des_phy_reg] = 0;
-      //  printf("mul3 %d    %d iq_entry.des_phy_reg]", cpu->phys_regs[iq_entry.des_phy_reg], iq_entry.des_phy_reg);
-    
-        iq_entry.finishedstage = MUL3;
-        cpu->mul3.has_insn=FALSE;
-    if (ENABLE_DEBUG_MESSAGES)
-    {
-        printf("Instruction at mul3____________Stage--->");
-        printf("\n");
+        //  printf("mul3 %d    %d iq_entry.des_phy_reg]", cpu->phys_regs[iq_entry.des_phy_reg], iq_entry.des_phy_reg);
 
-        printf("%-15s: pc(%d) ", "mul3", iq_entry.pc);
-        printf("\n");
-    }
+        iq_entry.finishedstage = MUL3;
+        cpu->mul3.has_insn = FALSE;
+        if (ENABLE_DEBUG_MESSAGES)
+        {
+            printf("Instruction at mul3____________Stage--->");
+            printf("\n");
+
+            printf("%-15s: pc(%d) ", "mul3", iq_entry.pc);
+            printf("\n");
+        }
     }
     return 0;
 }
-
+int APEX_jbu1(APEX_CPU *cpu)
+{
+    return 0;
+}
+int APEX_jbu2(APEX_CPU *cpu)
+{
+    return 0;
+}
 /*
  * This function creates and initializes APEX cpu.
  *
@@ -628,7 +799,8 @@ void APEX_cpu_run(APEX_CPU *cpu)
             printf("Clock Cycle #: %d\n", cpu->clock);
             printf("--------------------------------------------\n");
         }
-
+        APEX_mul1(cpu);
+        APEX_jbu1(cpu);
         APEX_mul3(cpu);
         APEX_mul2(cpu);
         APEX_mul1(cpu);

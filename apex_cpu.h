@@ -125,7 +125,9 @@ typedef struct APEX_CPU
     CPU_Stage intfu ; 
     CPU_Stage mul1 ;
     CPU_Stage mul2 ;
-    CPU_Stage mul3 ; 
+    CPU_Stage mul3 ;
+    CPU_Stage jbu1 ;
+    CPU_Stage jbu2 ; 
     IQ_ENTRY iq_entry;
 } APEX_CPU;
 
