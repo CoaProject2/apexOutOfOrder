@@ -23,19 +23,47 @@
 static int
 get_num_from_string(const char *buffer)
 {
-    char str[16];
-    int i, j = 0;
+   char str[16];
+   int i, j = 0;
 
-    for (i = 1; buffer[i] != '\0'; ++i)
-    {
-        str[j] = buffer[i];
-        j++;
-    }
-    str[j] = '\0';
+   for (i = 1; buffer[i] != '\0'; ++i)
+   {
+       str[j] = buffer[i];
+       j++;
+   }
+   str[j] = '\0';
 
-    return atoi(str);
+   return atoi(str);
 }
+static void
+split_opcode_from_insn_string(char *buffer, char tokens[2][128])
+{
+    int token_num = 0;
 
+    char *token = strtok(buffer, " ");
+    char *p;
+
+    while (token != NULL)
+    {
+        strcpy(tokens[token_num], token);
+        token_num++;
+        token = strtok(NULL, " ");
+    }
+
+    p = tokens[0];
+
+    /* This removes the newline character at the end of
+* single string opcodes like HALT or NOP */
+    while (*p != '\0')
+    {
+        if (*p == '\n')
+        {
+            *p = '\0';
+            break;
+        }
+        p++;
+    }
+}
 /*
  * This function sets the numeric opcode to an instruction based on string value
  *
@@ -109,24 +137,36 @@ set_opcode_str(const char *opcode_str)
         return OPCODE_HALT;
     }
 
+    if (strcmp(opcode_str, "LDR") == 0)
+    {
+        return OPCODE_LDR;
+    }
+    if (strcmp(opcode_str, "STR") == 0)
+    {
+        return OPCODE_STR;
+    }
+    if (strcmp(opcode_str, "ADDL") == 0)
+    {
+        return OPCODE_ADDL;
+    }
+    if (strcmp(opcode_str, "SUBL") == 0)
+    {
+        return OPCODE_SUBL;
+    }
+    if (strcmp(opcode_str, "CMP") == 0)
+    {
+        return OPCODE_CMP;
+    }
+    if (strcmp(opcode_str, "NOP") == 0)
+    {
+        return OPCODE_NOP;
+    }
+
     assert(0 && "Invalid opcode");
     return 0;
 }
 
-static void
-split_opcode_from_insn_string(char *buffer, char tokens[2][128])
-{
-    int token_num = 0;
 
-    char *token = strtok(buffer, " ");
-
-    while (token != NULL)
-    {
-        strcpy(tokens[token_num], token);
-        token_num++;
-        token = strtok(NULL, " ");
-    }
-}
 
 /*
  * This function is related to parsing input file
