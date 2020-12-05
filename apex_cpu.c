@@ -167,7 +167,19 @@ static void print_rename_table(APEX_CPU *cpu)
     {
         if (cpu->rename_table[i] != -1)
         {
-            printf("R[%d] -> P[%d] == %d  \n ", i, cpu->rename_table[i],cpu->phys_regs[cpu->rename_table[i]]);
+            printf("RAT[%d] -> P[%d] == %d  \n ", i, cpu->rename_table[i],cpu->phys_regs[cpu->rename_table[i]]);
+        }
+    }
+}
+static void print_r_rename_table(APEX_CPU *cpu)
+{
+    printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
+    printf("Details of R-RENAME TABLE State --\n");
+    for (int i = 0; i < 16; i++)
+    {
+        if (cpu->r_rename_table[i] != -1)
+        {
+            printf("R-RAT[%d] -> P[%d] == %d  \n ", i, cpu->r_rename_table[i],cpu->phys_regs[cpu->r_rename_table[i]]);
         }
     }
 }
@@ -1033,6 +1045,7 @@ void APEX_cpu_run(APEX_CPU *cpu)
         //  print_reg_file(cpu);
 
         print_rename_table(cpu);
+        print_r_rename_table(cpu);
         if (cpu->single_step)
         {
             printf("Press any key to advance CPU Clock or <q> to quit:\n");
