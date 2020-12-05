@@ -135,29 +135,55 @@ print_stage_content(const char *name, const CPU_Stage *stage)
  *
  * Note: You are not supposed to edit this function
  */
-static void
-print_reg_file(const APEX_CPU *cpu)
-{
-    int i;
-    printf("----------\n%s\n----------\n", "Registers:");
+// static void
+// print_reg_file(const APEX_CPU *cpu)
+// {
+//     int i;
+//     printf("----------\n%s\n----------\n", "Registers:");
 
-    for (int i = 0; i < REG_FILE_SIZE / 2; ++i)
-    {
-        printf("R%-3d[%-3d] ", i, cpu->regs[i]);
-    }
-    printf("\n");
-    for (i = (REG_FILE_SIZE / 2); i < REG_FILE_SIZE; ++i)
-    {
-        printf("R%-3d[%-3d] ", i, cpu->regs[i]);
-    }
-    printf("\n");
-}
+//     for (int i = 0; i < REG_FILE_SIZE / 2; ++i)
+//     {
+//         printf("R%-3d[%-3d] ", i, cpu->regs[i]);
+//     }
+//     printf("\n");
+//     for (i = (REG_FILE_SIZE / 2); i < REG_FILE_SIZE; ++i)
+//     {
+//         printf("R%-3d[%-3d] ", i, cpu->regs[i]);
+//     }
+//     printf("\n");
+// }
 
 /*
  * Fetch Stage of APEX Pipeline
  *
  * Note: You are free to edit this function according to your implementation
  */
+
+static void print_rename_table(APEX_CPU *cpu)
+{
+    printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
+    printf("Details of RENAME TABLE State --\n");
+    for (int i = 0; i < 16; i++)
+    {
+        if (cpu->rename_table[i] != -1)
+        {
+            printf("R[%d] -> P[%d] == %d  \n ", i, cpu->rename_table[i],cpu->phys_regs[cpu->rename_table[i]]);
+        }
+    }
+}
+static void print_physical_register(APEX_CPU *cpu)
+{
+
+    printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
+    printf("Details of Physical register State --\n");
+    for (int i = 0; i < 48; i++)
+    {
+        ///  if (cpu->free_PR_list[i] == 1)
+        // {
+        printf(" P[%d]  ==== [%d] \n  ", i, cpu->phys_regs[i]);
+        // }
+    }
+}
 static void
 APEX_fetch(APEX_CPU *cpu)
 {
@@ -285,8 +311,8 @@ APEX_decode(APEX_CPU *cpu)
                     }
                 }
                 iq_entry->opcode = cpu->decode.opcode;
-                strcpy(iq_entry->opcode_str , cpu->decode.opcode_str);
-                iq_entry->src1 = rs1_physical; 
+                strcpy(iq_entry->opcode_str, cpu->decode.opcode_str);
+                iq_entry->src1 = rs1_physical;
                 //cpu->phys_regs[rs1_physical]
                 iq_entry->src2 = rs2_physical;
                 //cpu->phys_regs[rs2_physical]
@@ -424,7 +450,7 @@ APEX_issuequeue(APEX_CPU *cpu)
                 printf("IQ[0%d] --> ", i);
                 iq_entry1 = &cpu->IssueQueue[i];
 
-                printf("%-15s: pc(%d) %s", "Issuequeue ", iq_entry1->pc,iq_entry1->opcode_str);
+                printf("%-15s: pc(%d) %s", "Issuequeue ", iq_entry1->pc, iq_entry1->opcode_str);
             }
         }
         printf("\n");
@@ -730,7 +756,7 @@ APEX_intfu(APEX_CPU *cpu)
             printf("Instruction at intfu____________Stage--->");
             printf("\n");
 
-            printf("%-15s: pc(%d) %s", "intfu ", iq_entry.pc,iq_entry.opcode_str);
+            printf("%-15s: pc(%d) %s", "intfu ", iq_entry.pc, iq_entry.opcode_str);
             printf("\n");
         }
     }
@@ -1005,15 +1031,8 @@ void APEX_cpu_run(APEX_CPU *cpu)
         APEX_fetch(cpu);
 
         //  print_reg_file(cpu);
-        printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
-        printf("Details of Physical register State --\n");
-        for (int i = 0; i < 48; i++)
-        {
-            ///  if (cpu->free_PR_list[i] == 1)
-            // {
-            printf(" P[%d]  ==== [%d] \n  ", i, cpu->phys_regs[i]);
-            // }
-        }
+
+        print_rename_table(cpu);
         if (cpu->single_step)
         {
             printf("Press any key to advance CPU Clock or <q> to quit:\n");
