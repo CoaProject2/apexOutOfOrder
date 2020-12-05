@@ -360,17 +360,16 @@ APEX_decode(APEX_CPU *cpu)
                     break;
                 }
                 case OPCODE_HALT:
-                case OPCODE_NOP:
+                
                 {
                     /* HALT/NOP doesn't have register operands */
                     iq_entry->fu_type = 3;
                     break;
                 }
                 }
-           
             }
         }
-           
+
         if (ENABLE_DEBUG_MESSAGES)
         {
             print_stage_content("Instruction at decode____________Stage--->", &cpu->decode);
@@ -385,10 +384,7 @@ APEX_decode(APEX_CPU *cpu)
 static void
 APEX_issuequeue(APEX_CPU *cpu)
 {
-
     int issuequequeindex;
-    // int selectedinstpc;
-
     int intfuissued = -1;
     int mulfuissued = -1;
     int branchfuissued = -1;
@@ -447,7 +443,6 @@ APEX_issuequeue(APEX_CPU *cpu)
             {
                 selectedmulfuiqentry = iqe;
                 mulfuissued = issuequequeindex;
-                
             }
             break;
         }
@@ -458,9 +453,8 @@ APEX_issuequeue(APEX_CPU *cpu)
             {
                 selectedbranchfuiqentry = iqe;
                 branchfuissued = issuequequeindex;
-                
             }
-         break;   
+            break;
         }
         }
     }
@@ -524,14 +518,7 @@ APEX_intfu(APEX_CPU *cpu)
         case OPCODE_ADD:
         {
             cpu->intfu.result_buffer = cpu->phys_regs[iq_entry.src1] + cpu->phys_regs[iq_entry.src2];
-            if (cpu->intfu.result_buffer == 0)
-            {
-                cpu->zero_flag = TRUE;
-            }
-            else
-            {
-                cpu->zero_flag = FALSE;
-            }
+            
             instruction_retirement(cpu, iq_entry);
             break;
         }
@@ -553,14 +540,7 @@ APEX_intfu(APEX_CPU *cpu)
         {
             cpu->intfu.result_buffer = iq_entry.src1 + iq_entry.imm;
 
-            if (cpu->intfu.result_buffer == 0)
-            {
-                cpu->zero_flag = TRUE;
-            }
-            else
-            {
-                cpu->zero_flag = FALSE;
-            }
+            
             instruction_retirement(cpu, iq_entry);
 
             break;
@@ -584,28 +564,14 @@ APEX_intfu(APEX_CPU *cpu)
         case OPCODE_AND:
         {
             cpu->intfu.result_buffer = cpu->phys_regs[iq_entry.src1] & cpu->phys_regs[iq_entry.src2];
-            if (cpu->intfu.result_buffer == 0)
-            {
-                cpu->zero_flag = TRUE;
-            }
-            else
-            {
-                cpu->zero_flag = FALSE;
-            }
+            
             instruction_retirement(cpu, iq_entry);
             break;
         }
         case OPCODE_OR:
         {
             cpu->intfu.result_buffer = cpu->phys_regs[iq_entry.src1] | cpu->phys_regs[iq_entry.src2];
-            if (cpu->intfu.result_buffer == 0)
-            {
-                cpu->zero_flag = TRUE;
-            }
-            else
-            {
-                cpu->zero_flag = FALSE;
-            }
+            
             instruction_retirement(cpu, iq_entry);
             break;
 
@@ -614,14 +580,7 @@ APEX_intfu(APEX_CPU *cpu)
         case OPCODE_XOR:
         {
             cpu->intfu.result_buffer = cpu->phys_regs[iq_entry.src1] ^ cpu->phys_regs[iq_entry.src2];
-            if (cpu->intfu.result_buffer == 0)
-            {
-                cpu->zero_flag = TRUE;
-            }
-            else
-            {
-                cpu->zero_flag = FALSE;
-            }
+            
             instruction_retirement(cpu, iq_entry);
             break;
 
@@ -717,41 +676,41 @@ int APEX_mul3(APEX_CPU *cpu)
 
     if (!cpu->mul3.stalled && iq_entry.finishedstage < MUL3 && cpu->mul3.has_insn)
     {
-if (cpu->r_rename_table[iq_entry.des_rd] == 0 || cpu->r_rename_table[iq_entry.des_rd] == -1)
-    {
+        if (cpu->r_rename_table[iq_entry.des_rd] == 0 || cpu->r_rename_table[iq_entry.des_rd] == -1)
+        {
 
-        //instruction retriement process
-        //iq_entry.des_phy_reg ==freed entry
+            //instruction retriement process
+            //iq_entry.des_phy_reg ==freed entry
 
-        cpu->phys_regs[iq_entry.des_phy_reg] = cpu->mul3.result_buffer;
-        //the phy is valid now
-        cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
+            cpu->phys_regs[iq_entry.des_phy_reg] = cpu->mul3.result_buffer;
+            //the phy is valid now
+            cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
 
-        //rat update content is valid
-        cpu->rename_table_valid[iq_entry.des_rd] = 1;
+            //rat update content is valid
+            cpu->rename_table_valid[iq_entry.des_rd] = 1;
 
-        //the r-rat entry is of rd is pointing to most recent phy_reg
-        cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
-        cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
-    }
-    else
-    {
-        int previous_rat_index = cpu->r_rename_table[iq_entry.des_rd];
-        //the phy is invalid now
-        cpu->phys_regs_valid[previous_rat_index] = 0;
-        //free physical register
-        //mark contents has  free
-        cpu->free_PR_list[previous_rat_index] = 0;
+            //the r-rat entry is of rd is pointing to most recent phy_reg
+            cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
+            cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
+        }
+        else
+        {
+            int previous_rat_index = cpu->r_rename_table[iq_entry.des_rd];
+            //the phy is invalid now
+            cpu->phys_regs_valid[previous_rat_index] = 0;
+            //free physical register
+            //mark contents has  free
+            cpu->free_PR_list[previous_rat_index] = 0;
 
-        cpu->phys_regs[iq_entry.des_phy_reg] = cpu->mul3.result_buffer;
-        //the phy is valid now
-        cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
-        //rat update content is valid
-        cpu->rename_table_valid[iq_entry.des_rd] = 1;
-        //the r-rat entry is of rd is pointing to most recent phy_reg
-        cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
-        cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
-    }
+            cpu->phys_regs[iq_entry.des_phy_reg] = cpu->mul3.result_buffer;
+            //the phy is valid now
+            cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
+            //rat update content is valid
+            cpu->rename_table_valid[iq_entry.des_rd] = 1;
+            //the r-rat entry is of rd is pointing to most recent phy_reg
+            cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
+            cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
+        }
         iq_entry.finishedstage = MUL3;
         cpu->mul3.has_insn = FALSE;
         if (ENABLE_DEBUG_MESSAGES)
@@ -929,7 +888,8 @@ void APEX_cpu_run(APEX_CPU *cpu)
 
         print_rename_table(cpu);
         print_r_rename_table(cpu);
-        if (FALSE)print_physical_register(cpu);
+        if (FALSE)
+            print_physical_register(cpu);
         if (cpu->single_step)
         {
             printf("Press any key to advance CPU Clock or <q> to quit:\n");
