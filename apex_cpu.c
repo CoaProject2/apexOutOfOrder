@@ -190,10 +190,10 @@ static void print_physical_register(APEX_CPU *cpu)
     printf("Details of Physical register State --\n");
     for (int i = 0; i < 48; i++)
     {
-        ///  if (cpu->free_PR_list[i] == 1)
-        // {
-        printf(" P[%d]  ==== [%d] \n  ", i, cpu->phys_regs[i]);
-        // }
+        if (cpu->free_PR_list[i] == 1)
+        {
+            printf(" P[%d]  ==== [%d] \n  ", i, cpu->phys_regs[i]);
+        }
     }
 }
 static void
@@ -359,22 +359,22 @@ APEX_decode(APEX_CPU *cpu)
                     iq_entry->fu_type = 5;
                     break;
                 }
+                case OPCODE_HALT:
+                case OPCODE_NOP:
+                {
+                    /* HALT/NOP doesn't have register operands */
+                    iq_entry->fu_type = 3;
+                    break;
                 }
+                }
+           
             }
         }
+           
         if (ENABLE_DEBUG_MESSAGES)
         {
             print_stage_content("Instruction at decode____________Stage--->", &cpu->decode);
         }
-        // printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
-        // printf("Details of RENAME TABLE State --\n");
-        // for (int i = 0; i < 16; i++)
-        // {
-        //     if (cpu->rename_table[i] != -1)
-        //     {
-        //         printf("R[%d] -> P[%d]\n", i, cpu->rename_table[i]);
-        //     }
-        // }
     }
 }
 /*
@@ -411,8 +411,21 @@ APEX_issuequeue(APEX_CPU *cpu)
         {
         case OPCODE_ADD:
         case OPCODE_SUB:
+        case OPCODE_AND:
+        case OPCODE_OR:
+        case OPCODE_XOR:
         {
             if (cpu->phys_regs_valid[iqe.src1] == 1 && cpu->phys_regs_valid[iqe.src2] == 1)
+            {
+                selectedintfuiqentry = iqe;
+                intfuissued = issuequequeindex;
+            }
+            break;
+        }
+        case OPCODE_ADDL:
+        case OPCODE_SUBL:
+        {
+            if (cpu->phys_regs_valid[iqe.src1] == 1)
             {
                 selectedintfuiqentry = iqe;
                 intfuissued = issuequequeindex;
@@ -433,21 +446,21 @@ APEX_issuequeue(APEX_CPU *cpu)
 
             {
                 selectedmulfuiqentry = iqe;
-                //   selectedinstpc = iqe.pc;
                 mulfuissued = issuequequeindex;
-                break;
+                
             }
+            break;
         }
         case OPCODE_JUMP:
         case OPCODE_JAL:
         {
-            if (iqe.src1_ready == 1)
+            if (cpu->phys_regs_valid[iqe.src1] == 1)
             {
                 selectedbranchfuiqentry = iqe;
-                //   selectedinstpc = iqe.pc;
                 branchfuissued = issuequequeindex;
-                break;
+                
             }
+         break;   
         }
         }
     }
@@ -481,13 +494,11 @@ APEX_issuequeue(APEX_CPU *cpu)
     }
     if (mulfuissued > -1)
     {
-
         IQ_ENTRY entry = selectedmulfuiqentry;
         entry.finishedstage = IQ;
         cpu->mul1.iq_entry = entry;
         cpu->mul1.stalled = 0;
         cpu->mul1.has_insn = TRUE;
-
         cpu->freeiq[mulfuissued] = 0;
     }
     if (branchfuissued > -1)
@@ -497,7 +508,6 @@ APEX_issuequeue(APEX_CPU *cpu)
         cpu->jbu1.iq_entry = entry;
         cpu->jbu1.stalled = 0;
         cpu->jbu1.has_insn = TRUE;
-
         cpu->freeiq[branchfuissued] = 0;
     }
 }
@@ -522,47 +532,12 @@ APEX_intfu(APEX_CPU *cpu)
             {
                 cpu->zero_flag = FALSE;
             }
-            if (cpu->r_rename_table[iq_entry.des_rd] == 0 || cpu->r_rename_table[iq_entry.des_rd] == -1)
-            {
-
-                //instruction retriement process
-                //iq_entry.des_phy_reg ==freed entry
-
-                cpu->phys_regs[iq_entry.des_phy_reg] = cpu->intfu.result_buffer;
-                //the phy is valid now
-                cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
-
-                //rat update content is valid
-                cpu->rename_table_valid[iq_entry.des_rd] = 1;
-
-                //the r-rat entry is of rd is pointing to most recent phy_reg
-                cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
-                cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
-            }
-            else
-            {
-                int previous_rat_index = cpu->r_rename_table[iq_entry.des_rd];
-                //the phy is invalid now
-                cpu->phys_regs_valid[previous_rat_index] = 0;
-                //free physical register
-                //mark contents has  free
-                cpu->free_PR_list[previous_rat_index] = 0;
-
-                cpu->phys_regs[iq_entry.des_phy_reg] = cpu->intfu.result_buffer;
-                //the phy is valid now
-                cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
-                //rat update content is valid
-                cpu->rename_table_valid[iq_entry.des_rd] = 1;
-                //the r-rat entry is of rd is pointing to most recent phy_reg
-                cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
-                cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
-            }
+            instruction_retirement(cpu, iq_entry);
             break;
         }
         case OPCODE_SUB:
         {
-           // cpu->intfu.result_buffer = iq_entry.src1 - iq_entry.src2;
-            cpu->intfu.result_buffer =cpu->phys_regs[iq_entry.src1] - cpu->phys_regs[iq_entry.src2];
+            cpu->intfu.result_buffer = cpu->phys_regs[iq_entry.src1] - cpu->phys_regs[iq_entry.src2];
             if (cpu->intfu.result_buffer == 0)
             {
                 cpu->zero_flag = TRUE;
@@ -571,221 +546,105 @@ APEX_intfu(APEX_CPU *cpu)
             {
                 cpu->zero_flag = FALSE;
             }
-            if (cpu->r_rename_table[iq_entry.des_rd] == 0 || cpu->r_rename_table[iq_entry.des_rd] == -1)
-            {
-
-                //instruction retriement process
-                //iq_entry.des_phy_reg ==freed entry
-
-                cpu->phys_regs[iq_entry.des_phy_reg] = cpu->intfu.result_buffer;
-                //the phy is valid now
-                cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
-
-                //rat update content is valid
-                cpu->rename_table_valid[iq_entry.des_rd] = 1;
-
-                //the r-rat entry is of rd is pointing to most recent phy_reg
-                cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
-                cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
-            }
-            else
-            {
-                int previous_rat_index = cpu->r_rename_table[iq_entry.des_rd];
-                //the phy is invalid now
-                cpu->phys_regs_valid[previous_rat_index] = 0;
-                //free physical register
-                //mark contents has  free
-                cpu->free_PR_list[previous_rat_index] = 0;
-
-                cpu->phys_regs[iq_entry.des_phy_reg] = cpu->intfu.result_buffer;
-                //the phy is valid now
-                cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
-                //rat update content is valid
-                cpu->rename_table_valid[iq_entry.des_rd] = 1;
-                //the r-rat entry is of rd is pointing to most recent phy_reg
-                cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
-                cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
-            }
-
+            instruction_retirement(cpu, iq_entry);
             break;
         }
         case OPCODE_ADDL:
         {
-            if (iq_entry.src1_ready == 1)
+            cpu->intfu.result_buffer = iq_entry.src1 + iq_entry.imm;
+
+            if (cpu->intfu.result_buffer == 0)
             {
-                cpu->intfu.result_buffer = iq_entry.src1 + iq_entry.imm;
-                //instruction retriement process
-                cpu->phys_regs[iq_entry.des_phy_reg] = cpu->intfu.result_buffer;
-                //freethelist
-                cpu->free_PR_list[iq_entry.des_phy_reg] = 0;
-
-                printf("Add %d    %d iq_entry.des_phy_reg]", cpu->phys_regs[iq_entry.des_phy_reg], iq_entry.des_phy_reg);
-
-                if (cpu->intfu.result_buffer == 0)
-                {
-                    cpu->zero_flag = TRUE;
-                }
-                else
-                {
-                    cpu->zero_flag = FALSE;
-                }
+                cpu->zero_flag = TRUE;
             }
+            else
+            {
+                cpu->zero_flag = FALSE;
+            }
+            instruction_retirement(cpu, iq_entry);
 
             break;
         }
 
         case OPCODE_SUBL:
         {
-            if (iq_entry.src1_ready == 1)
+            cpu->intfu.result_buffer = iq_entry.src1 - iq_entry.imm;
+
+            if (cpu->intfu.result_buffer == 0)
             {
-                cpu->intfu.result_buffer = iq_entry.src1 - iq_entry.imm;
-                //instruction retriement process
-                cpu->phys_regs[iq_entry.des_phy_reg] = cpu->intfu.result_buffer;
-                //freethelist
-                cpu->free_PR_list[iq_entry.des_phy_reg] = 0;
-
-                printf("Add %d    %d iq_entry.des_phy_reg]", cpu->phys_regs[iq_entry.des_phy_reg], iq_entry.des_phy_reg);
-
-                if (cpu->intfu.result_buffer == 0)
-                {
-                    cpu->zero_flag = TRUE;
-                }
-                else
-                {
-                    cpu->zero_flag = FALSE;
-                }
+                cpu->zero_flag = TRUE;
             }
-
+            else
+            {
+                cpu->zero_flag = FALSE;
+            }
+            instruction_retirement(cpu, iq_entry);
             break;
         }
         case OPCODE_AND:
         {
-            if (iq_entry.src1_ready == 1 && iq_entry.src2_ready == 1)
+            cpu->intfu.result_buffer = cpu->phys_regs[iq_entry.src1] & cpu->phys_regs[iq_entry.src2];
+            if (cpu->intfu.result_buffer == 0)
             {
-                cpu->intfu.result_buffer = iq_entry.src1 & iq_entry.src2;
-                //instruction retriement process
-                cpu->phys_regs[iq_entry.des_phy_reg] = cpu->intfu.result_buffer;
-                //freethelist
-                cpu->free_PR_list[iq_entry.des_phy_reg] = 0;
-
-                printf("Add %d    %d iq_entry.des_phy_reg]", cpu->phys_regs[iq_entry.des_phy_reg], iq_entry.des_phy_reg);
-
-                if (cpu->intfu.result_buffer == 0)
-                {
-                    cpu->zero_flag = TRUE;
-                }
-                else
-                {
-                    cpu->zero_flag = FALSE;
-                }
+                cpu->zero_flag = TRUE;
             }
-
+            else
+            {
+                cpu->zero_flag = FALSE;
+            }
+            instruction_retirement(cpu, iq_entry);
             break;
         }
         case OPCODE_OR:
         {
-            if (iq_entry.src1_ready == 1 && iq_entry.src2_ready == 1)
+            cpu->intfu.result_buffer = cpu->phys_regs[iq_entry.src1] | cpu->phys_regs[iq_entry.src2];
+            if (cpu->intfu.result_buffer == 0)
             {
-                cpu->intfu.result_buffer = iq_entry.src1 | iq_entry.src2;
-                //instruction retriement process
-                cpu->phys_regs[iq_entry.des_phy_reg] = cpu->intfu.result_buffer;
-                //freethelist
-                cpu->free_PR_list[iq_entry.des_phy_reg] = 0;
-
-                printf("Add %d    %d iq_entry.des_phy_reg]", cpu->phys_regs[iq_entry.des_phy_reg], iq_entry.des_phy_reg);
-
-                if (cpu->intfu.result_buffer == 0)
-                {
-                    cpu->zero_flag = TRUE;
-                }
-                else
-                {
-                    cpu->zero_flag = FALSE;
-                }
+                cpu->zero_flag = TRUE;
             }
+            else
+            {
+                cpu->zero_flag = FALSE;
+            }
+            instruction_retirement(cpu, iq_entry);
+            break;
 
             break;
         }
         case OPCODE_XOR:
         {
-            if (iq_entry.src1_ready == 1 && iq_entry.src2_ready == 1)
+            cpu->intfu.result_buffer = cpu->phys_regs[iq_entry.src1] ^ cpu->phys_regs[iq_entry.src2];
+            if (cpu->intfu.result_buffer == 0)
             {
-                cpu->intfu.result_buffer = iq_entry.src1 ^ iq_entry.src2;
-                //instruction retriement process
-                cpu->phys_regs[iq_entry.des_phy_reg] = cpu->intfu.result_buffer;
-                //freethelist
-                cpu->free_PR_list[iq_entry.des_phy_reg] = 0;
-
-                printf("Add %d    %d iq_entry.des_phy_reg]", cpu->phys_regs[iq_entry.des_phy_reg], iq_entry.des_phy_reg);
-
-                if (cpu->intfu.result_buffer == 0)
-                {
-                    cpu->zero_flag = TRUE;
-                }
-                else
-                {
-                    cpu->zero_flag = FALSE;
-                }
+                cpu->zero_flag = TRUE;
             }
+            else
+            {
+                cpu->zero_flag = FALSE;
+            }
+            instruction_retirement(cpu, iq_entry);
+            break;
 
             break;
         }
         case OPCODE_CMP:
         {
-            if (iq_entry.src1_ready == 1 && iq_entry.src2_ready == 1)
+            cpu->intfu.result_buffer = cpu->phys_regs[iq_entry.src1] - cpu->phys_regs[iq_entry.src2];
+            if (cpu->intfu.result_buffer == 0)
             {
-                cpu->intfu.result_buffer = iq_entry.src1 - iq_entry.src2;
-
-                if (cpu->intfu.result_buffer == 0)
-                {
-                    cpu->zero_flag = TRUE;
-                }
-                else
-                {
-                    cpu->zero_flag = FALSE;
-                }
+                cpu->zero_flag = TRUE;
             }
-
+            else
+            {
+                cpu->zero_flag = FALSE;
+            }
+            instruction_retirement(cpu, iq_entry);
             break;
         }
         case OPCODE_MOVC:
         {
             cpu->intfu.result_buffer = iq_entry.imm;
-            if (cpu->r_rename_table[iq_entry.des_rd] == 0 || cpu->r_rename_table[iq_entry.des_rd] == -1)
-            {
-
-                //instruction retriement process
-                //iq_entry.des_phy_reg ==freed entry
-
-                cpu->phys_regs[iq_entry.des_phy_reg] = cpu->intfu.result_buffer;
-                //the phy is valid now
-                cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
-
-                //rat update content is valid
-                cpu->rename_table_valid[iq_entry.des_rd] = 1;
-
-                //the r-rat entry is of rd is pointing to most recent phy_reg
-                cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
-                cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
-            }
-            else
-            {
-                int previous_rat_index = cpu->r_rename_table[iq_entry.des_rd];
-                //the phy is invalid now
-                cpu->phys_regs_valid[previous_rat_index] = 0;
-                //free physical register
-                //mark contents has  free
-                cpu->free_PR_list[previous_rat_index] = 0;
-
-                cpu->phys_regs[iq_entry.des_phy_reg] = cpu->intfu.result_buffer;
-                //the phy is valid now
-                cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
-                //rat update content is valid
-                cpu->rename_table_valid[iq_entry.des_rd] = 1;
-                //the r-rat entry is of rd is pointing to most recent phy_reg
-                cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
-                cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
-            }
+            instruction_retirement(cpu, iq_entry);
             break;
         }
         }
@@ -810,7 +669,6 @@ int APEX_mul1(APEX_CPU *cpu)
     {
         if (iq_entry.opcode == OPCODE_MUL)
         {
-            // cpu->mul1.result_buffer = iq_entry.src1 * iq_entry.src2;
             cpu->mul1.result_buffer = cpu->phys_regs[iq_entry.src1] * cpu->phys_regs[iq_entry.src2];
         }
         iq_entry.finishedstage = MUL1;
@@ -859,48 +717,46 @@ int APEX_mul3(APEX_CPU *cpu)
 
     if (!cpu->mul3.stalled && iq_entry.finishedstage < MUL3 && cpu->mul3.has_insn)
     {
-        if (cpu->r_rename_table[iq_entry.des_rd] == 0 || cpu->r_rename_table[iq_entry.des_rd] == -1)
-        {
+if (cpu->r_rename_table[iq_entry.des_rd] == 0 || cpu->r_rename_table[iq_entry.des_rd] == -1)
+    {
 
-            //instruction retriement process
-            //iq_entry.des_phy_reg ==freed entry
+        //instruction retriement process
+        //iq_entry.des_phy_reg ==freed entry
 
-            cpu->phys_regs[iq_entry.des_phy_reg] = cpu->mul3.result_buffer;
-            //the phy is valid now
-            cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
+        cpu->phys_regs[iq_entry.des_phy_reg] = cpu->mul3.result_buffer;
+        //the phy is valid now
+        cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
 
-            //rat update content is valid
-            cpu->rename_table_valid[iq_entry.des_rd] = 1;
+        //rat update content is valid
+        cpu->rename_table_valid[iq_entry.des_rd] = 1;
 
-            //the r-rat entry is of rd is pointing to most recent phy_reg
-            cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
-            cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
-        }
-        else
-        {
-            int previous_rat_index = cpu->r_rename_table[iq_entry.des_rd];
-            //the phy is invalid now
-            cpu->phys_regs_valid[previous_rat_index] = 0;
-            //free physical register
-            //mark contents has  free
-            cpu->free_PR_list[previous_rat_index] = 0;
+        //the r-rat entry is of rd is pointing to most recent phy_reg
+        cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
+        cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
+    }
+    else
+    {
+        int previous_rat_index = cpu->r_rename_table[iq_entry.des_rd];
+        //the phy is invalid now
+        cpu->phys_regs_valid[previous_rat_index] = 0;
+        //free physical register
+        //mark contents has  free
+        cpu->free_PR_list[previous_rat_index] = 0;
 
-            cpu->phys_regs[iq_entry.des_phy_reg] = cpu->mul3.result_buffer;
-            //the phy is valid now
-            cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
-            //rat update content is valid
-            cpu->rename_table_valid[iq_entry.des_rd] = 1;
-            //the r-rat entry is of rd is pointing to most recent phy_reg
-            cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
-            cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
-        }
-
+        cpu->phys_regs[iq_entry.des_phy_reg] = cpu->mul3.result_buffer;
+        //the phy is valid now
+        cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
+        //rat update content is valid
+        cpu->rename_table_valid[iq_entry.des_rd] = 1;
+        //the r-rat entry is of rd is pointing to most recent phy_reg
+        cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
+        cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
+    }
         iq_entry.finishedstage = MUL3;
         cpu->mul3.has_insn = FALSE;
         if (ENABLE_DEBUG_MESSAGES)
         {
             printf("Instruction at mul3____________Stage--->");
-            //   print_stage_content("Instruction at mul3____________Stage--->", &cpu->mul3);
             printf("\n");
 
             printf("%-15s: pc(%d) ", "mul3", iq_entry.pc);
@@ -918,12 +774,13 @@ int APEX_jbu1(APEX_CPU *cpu)
         {
         case OPCODE_JAL:
         {
-            cpu->jbu1.result_buffer = iq_entry.src1 + iq_entry.imm;
+            // cpu->jbu1.result_buffer = iq_entry.src1 + iq_entry.imm;
+            cpu->jbu1.result_buffer = cpu->phys_regs[iq_entry.src1] + iq_entry.imm;
             cpu->jbu1.rd = iq_entry.pc + 4;
         }
         case OPCODE_JUMP:
         {
-            cpu->jbu1.result_buffer = iq_entry.src1 + iq_entry.imm;
+            cpu->jbu1.result_buffer = cpu->phys_regs[iq_entry.src1] + iq_entry.imm;
         }
         }
         cpu->jbu2 = cpu->jbu1;
@@ -935,7 +792,6 @@ int APEX_jbu1(APEX_CPU *cpu)
             printf("\n");
 
             printf("%-15s: pc(%d) ", "jbu1", iq_entry.pc);
-            //  print_stage_content("Instruction at jbu1____________Stage--->", &cpu->jbu1);
             printf("\n");
         }
     }
@@ -963,7 +819,6 @@ int APEX_jbu2(APEX_CPU *cpu)
             printf("\n");
 
             printf("%-15s: pc(%d) ", "jbu2", iq_entry.pc);
-            //  print_stage_content("Instruction at jbu2____________Stage--->", &cpu->jbu2);
             printf("\n");
         }
     }
@@ -1074,6 +929,7 @@ void APEX_cpu_run(APEX_CPU *cpu)
 
         print_rename_table(cpu);
         print_r_rename_table(cpu);
+        if (FALSE)print_physical_register(cpu);
         if (cpu->single_step)
         {
             printf("Press any key to advance CPU Clock or <q> to quit:\n");
@@ -1087,6 +943,45 @@ void APEX_cpu_run(APEX_CPU *cpu)
         }
 
         cpu->clock++;
+    }
+}
+
+void instruction_retirement(APEX_CPU *cpu, IQ_ENTRY iq_entry)
+{
+    if (cpu->r_rename_table[iq_entry.des_rd] == 0 || cpu->r_rename_table[iq_entry.des_rd] == -1)
+    {
+
+        //instruction retriement process
+        //iq_entry.des_phy_reg ==freed entry
+
+        cpu->phys_regs[iq_entry.des_phy_reg] = cpu->intfu.result_buffer;
+        //the phy is valid now
+        cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
+
+        //rat update content is valid
+        cpu->rename_table_valid[iq_entry.des_rd] = 1;
+
+        //the r-rat entry is of rd is pointing to most recent phy_reg
+        cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
+        cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
+    }
+    else
+    {
+        int previous_rat_index = cpu->r_rename_table[iq_entry.des_rd];
+        //the phy is invalid now
+        cpu->phys_regs_valid[previous_rat_index] = 0;
+        //free physical register
+        //mark contents has  free
+        cpu->free_PR_list[previous_rat_index] = 0;
+
+        cpu->phys_regs[iq_entry.des_phy_reg] = cpu->intfu.result_buffer;
+        //the phy is valid now
+        cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
+        //rat update content is valid
+        cpu->rename_table_valid[iq_entry.des_rd] = 1;
+        //the r-rat entry is of rd is pointing to most recent phy_reg
+        cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
+        cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
     }
 }
 
