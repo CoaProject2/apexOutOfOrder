@@ -96,7 +96,7 @@ typedef struct APEX_CPU
     int fetch_from_next_cycle;
 
 
-	
+	int is_stalled;
 
     int phys_regs[48];
 	int phys_regs_valid[48];
@@ -104,8 +104,6 @@ typedef struct APEX_CPU
 
 	// Index represents the PR and values 1- represents free,0 - represents occupied.
 	int free_PR_list[48];
-	//Number of consumers for every physical register.
-	int consumers[48];
 
 
 

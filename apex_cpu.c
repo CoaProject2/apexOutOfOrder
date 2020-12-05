@@ -200,7 +200,7 @@ static void
 APEX_fetch(APEX_CPU *cpu)
 {
     APEX_Instruction *current_ins;
-    if (cpu->fetch.has_insn)
+    if (cpu->fetch.has_insn && !cpu->is_stalled)
     {
         if (!cpu->fetch.stalled)
         {
@@ -238,10 +238,10 @@ APEX_fetch(APEX_CPU *cpu)
                 cpu->fetch.stalled = 1;
             }
             /* Stop fetching new instructions if HALT is fetched */
-            if (cpu->fetch.opcode == OPCODE_HALT)
-            {
-                cpu->fetch.has_insn = FALSE;
-            }
+            // if (cpu->fetch.opcode == OPCODE_HALT)
+            // {
+            //     cpu->fetch.has_insn = FALSE;
+            // }
 
             if (ENABLE_DEBUG_MESSAGES)
             {
@@ -264,7 +264,7 @@ APEX_decode(APEX_CPU *cpu)
     {
         int stagestalled = 0;
         /*create a iq entruy*/
-        if (stagestalled == 0)
+        if (stagestalled == 0 && !cpu->is_stalled)
         {
             IQ_ENTRY *iq_entry = NULL;
 
@@ -342,28 +342,56 @@ APEX_decode(APEX_CPU *cpu)
                 case OPCODE_ADD:
                 case OPCODE_SUB:
                 case OPCODE_MOVC:
+                case OPCODE_CMP:
                 {
 
                     /*3 for ifu*/
                     iq_entry->fu_type = 3;
+                    cpu->decode.has_insn=FALSE;
                     break;
                 }
                 case OPCODE_MUL:
                 {
                     iq_entry->fu_type = 4;
+                    cpu->decode.has_insn=FALSE;
                     break;
                 }
                 case OPCODE_JUMP:
                 case OPCODE_JAL:
                 {
+                    cpu->is_stalled=1;
                     iq_entry->fu_type = 5;
+                    cpu->decode.has_insn=FALSE;
                     break;
                 }
+                
+                case OPCODE_BZ:
+                {
+                    if(cpu->zero_flag == TRUE){
+                       cpu->is_stalled=1; 
+                    }
+                    iq_entry->fu_type = 5;
+                    cpu->decode.has_insn=FALSE;
+                    break;
+                }
+                case OPCODE_BNZ:
+                {
+
+                    if(cpu->zero_flag == FALSE){
+                       cpu->is_stalled=1; 
+                    }
+                    iq_entry->fu_type = 5;
+                    cpu->decode.has_insn=FALSE;
+                    
+                    break;
+                }
+                
                 case OPCODE_HALT:
                 
                 {
                     /* HALT/NOP doesn't have register operands */
                     iq_entry->fu_type = 3;
+                    cpu->decode.has_insn=FALSE;
                     break;
                 }
                 }
@@ -456,6 +484,19 @@ APEX_issuequeue(APEX_CPU *cpu)
             }
             break;
         }
+        case OPCODE_BZ:
+        case OPCODE_BNZ:
+        {
+            selectedbranchfuiqentry = iqe;
+            branchfuissued = issuequequeindex;
+                break;
+        }
+        case OPCODE_HALT:
+        {
+            selectedintfuiqentry = iqe;
+            intfuissued = issuequequeindex;
+            break;
+        }
         }
     }
 
@@ -506,7 +547,7 @@ APEX_issuequeue(APEX_CPU *cpu)
     }
 }
 
-static void
+static int
 APEX_intfu(APEX_CPU *cpu)
 {
     IQ_ENTRY iq_entry = cpu->intfu.iq_entry;
@@ -606,6 +647,15 @@ APEX_intfu(APEX_CPU *cpu)
             instruction_retirement(cpu, iq_entry);
             break;
         }
+        case OPCODE_HALT:
+        {
+            /* Stop fetching new instructions if HALT is fetched */
+        
+            /* Stop the APEX simulator */
+            return TRUE;
+    
+        
+        }
         }
         iq_entry.finishedstage = INTFU;
         cpu->intfu.has_insn = FALSE;
@@ -618,6 +668,7 @@ APEX_intfu(APEX_CPU *cpu)
             printf("\n");
         }
     }
+    return 0;
 }
 
 int APEX_mul1(APEX_CPU *cpu)
@@ -736,10 +787,27 @@ int APEX_jbu1(APEX_CPU *cpu)
             // cpu->jbu1.result_buffer = iq_entry.src1 + iq_entry.imm;
             cpu->jbu1.result_buffer = cpu->phys_regs[iq_entry.src1] + iq_entry.imm;
             cpu->jbu1.rd = iq_entry.pc + 4;
+            break;
         }
         case OPCODE_JUMP:
         {
             cpu->jbu1.result_buffer = cpu->phys_regs[iq_entry.src1] + iq_entry.imm;
+            break;
+        }
+        case OPCODE_BZ:
+        {
+            if(cpu->zero_flag == TRUE){
+             cpu->jbu1.result_buffer = iq_entry.pc  + iq_entry.imm;
+            }
+            
+            break;
+        }
+        case OPCODE_BNZ:
+        {
+            if(cpu->zero_flag == FALSE){
+             cpu->jbu1.result_buffer = iq_entry.pc  + iq_entry.imm;
+            }
+            break;
         }
         }
         cpu->jbu2 = cpu->jbu1;
@@ -763,11 +831,71 @@ int APEX_jbu2(APEX_CPU *cpu)
         IQ_ENTRY iq_entry = cpu->jbu2.iq_entry;
         switch (iq_entry.opcode)
         {
+        case OPCODE_BZ:
+        {
+            if(cpu->zero_flag ==TRUE){
+            cpu->pc=cpu->jbu2.result_buffer ;
+            cpu->is_stalled=0; // 1 means stalled
+            }
+            break;
+        }
+        case OPCODE_BNZ:
+        {
+            if(cpu->zero_flag == FALSE){
+             cpu->pc=cpu->jbu2.result_buffer ;
+             cpu->is_stalled=0; // 1 means stalled
+            }
+            break;
+        }
         case OPCODE_JAL:
         {
+            cpu->is_stalled=0; // 1 means stalled
+            cpu->pc=cpu->jbu2.result_buffer ;
+
+            if (cpu->r_rename_table[iq_entry.des_rd] == 0 || cpu->r_rename_table[iq_entry.des_rd] == -1)
+    {
+
+        //instruction retriement process
+        //iq_entry.des_phy_reg ==freed entry
+
+        cpu->phys_regs[iq_entry.des_phy_reg] = cpu->jbu2.rd; //change rd
+        //the phy is valid now
+        cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
+
+        //rat update content is valid
+        cpu->rename_table_valid[iq_entry.des_rd] = 1;
+
+        //the r-rat entry is of rd is pointing to most recent phy_reg
+        cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
+        cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
+    }
+    else
+    {
+        int previous_rat_index = cpu->r_rename_table[iq_entry.des_rd];
+        //the phy is invalid now
+        cpu->phys_regs_valid[previous_rat_index] = 0;
+        //free physical register
+        //mark contents has  free
+        cpu->free_PR_list[previous_rat_index] = 0;
+
+        cpu->phys_regs[iq_entry.des_phy_reg] = cpu->jbu2.rd;
+        //the phy is valid now
+        cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
+        //rat update content is valid
+        cpu->rename_table_valid[iq_entry.des_rd] = 1;
+        //the r-rat entry is of rd is pointing to most recent phy_reg
+        cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
+        cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
+    }
+
+
+            break;
         }
         case OPCODE_JUMP:
         {
+         cpu->is_stalled=0;
+            cpu->pc=cpu->jbu2.result_buffer ;
+            break;
         }
         }
         cpu->jbu2.has_insn = FALSE;
@@ -811,7 +939,7 @@ APEX_cpu_init(const char *filename)
     memset(cpu->regs, 0, sizeof(int) * REG_FILE_SIZE);
     memset(cpu->data_memory, 0, sizeof(int) * DATA_MEMORY_SIZE);
     cpu->single_step = ENABLE_SINGLE_STEP;
-
+    cpu->zero_flag=-1;
     /* Parse input file and create code memory */
     cpu->code_memory = create_code_memory(filename, &cpu->code_memory_size);
 
@@ -879,7 +1007,9 @@ void APEX_cpu_run(APEX_CPU *cpu)
         APEX_mul3(cpu);
         APEX_mul2(cpu);
         APEX_mul1(cpu);
-        APEX_intfu(cpu);
+        if (APEX_intfu(cpu)){
+            break;
+        }
         APEX_issuequeue(cpu);
         APEX_decode(cpu);
         APEX_fetch(cpu);
