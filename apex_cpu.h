@@ -53,6 +53,7 @@ typedef struct IQ_ENTRY
 
 	int fu_type;
 	
+    int des_rd;
 } IQ_ENTRY;
 /* Model of CPU stage latch */
 typedef struct CPU_Stage
@@ -108,12 +109,13 @@ typedef struct APEX_CPU
 
 
 
+
 	//Rename table to contain info with Index represents the  Physical Register.
 	int rename_table[16];
-
+    int rename_table_valid[16];
 	//retired Rename table to contain info with Index represents the  Physical Register.
 	int r_rename_table[16];
-
+    int r_rename_table_valid[16];
     IQ_ENTRY IssueQueue[24];
   
   
