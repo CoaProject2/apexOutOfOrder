@@ -167,7 +167,7 @@ static void print_rename_table(APEX_CPU *cpu)
     {
         if (cpu->rename_table[i] != -1)
         {
-            printf("RAT[%d] -> P[%d] == %d  \n ", i, cpu->rename_table[i],cpu->phys_regs[cpu->rename_table[i]]);
+            printf("RAT[%d] -> P[%d] == %d  \n ", i, cpu->rename_table[i], cpu->phys_regs[cpu->rename_table[i]]);
         }
     }
 }
@@ -179,7 +179,7 @@ static void print_r_rename_table(APEX_CPU *cpu)
     {
         if (cpu->r_rename_table[i] != -1)
         {
-            printf("R-RAT[%d] -> P[%d] == %d  \n ", i, cpu->r_rename_table[i],cpu->phys_regs[cpu->r_rename_table[i]]);
+            printf("R-RAT[%d] -> P[%d] == %d  \n ", i, cpu->r_rename_table[i], cpu->phys_regs[cpu->r_rename_table[i]]);
         }
     }
 }
@@ -340,6 +340,7 @@ APEX_decode(APEX_CPU *cpu)
                 {
 
                 case OPCODE_ADD:
+                case OPCODE_SUB:
                 case OPCODE_MOVC:
                 {
 
@@ -409,6 +410,7 @@ APEX_issuequeue(APEX_CPU *cpu)
         switch (iqe.opcode)
         {
         case OPCODE_ADD:
+        case OPCODE_SUB:
         {
             if (cpu->phys_regs_valid[iqe.src1] == 1 && cpu->phys_regs_valid[iqe.src2] == 1)
             {
@@ -520,7 +522,7 @@ APEX_intfu(APEX_CPU *cpu)
             {
                 cpu->zero_flag = FALSE;
             }
-            if (cpu->r_rename_table[iq_entry.des_rd] == 0)
+            if (cpu->r_rename_table[iq_entry.des_rd] == 0 || cpu->r_rename_table[iq_entry.des_rd] == -1)
             {
 
                 //instruction retriement process
@@ -559,24 +561,50 @@ APEX_intfu(APEX_CPU *cpu)
         }
         case OPCODE_SUB:
         {
-            if (iq_entry.src1_ready == 1 && iq_entry.src2_ready == 1)
+           // cpu->intfu.result_buffer = iq_entry.src1 - iq_entry.src2;
+            cpu->intfu.result_buffer =cpu->phys_regs[iq_entry.src1] - cpu->phys_regs[iq_entry.src2];
+            if (cpu->intfu.result_buffer == 0)
             {
-                cpu->intfu.result_buffer = iq_entry.src1 - iq_entry.src2;
+                cpu->zero_flag = TRUE;
+            }
+            else
+            {
+                cpu->zero_flag = FALSE;
+            }
+            if (cpu->r_rename_table[iq_entry.des_rd] == 0 || cpu->r_rename_table[iq_entry.des_rd] == -1)
+            {
+
                 //instruction retriement process
+                //iq_entry.des_phy_reg ==freed entry
+
                 cpu->phys_regs[iq_entry.des_phy_reg] = cpu->intfu.result_buffer;
-                //freethelist
-                cpu->free_PR_list[iq_entry.des_phy_reg] = 0;
+                //the phy is valid now
+                cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
 
-                printf("Add %d    %d iq_entry.des_phy_reg]", cpu->phys_regs[iq_entry.des_phy_reg], iq_entry.des_phy_reg);
+                //rat update content is valid
+                cpu->rename_table_valid[iq_entry.des_rd] = 1;
 
-                if (cpu->intfu.result_buffer == 0)
-                {
-                    cpu->zero_flag = TRUE;
-                }
-                else
-                {
-                    cpu->zero_flag = FALSE;
-                }
+                //the r-rat entry is of rd is pointing to most recent phy_reg
+                cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
+                cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
+            }
+            else
+            {
+                int previous_rat_index = cpu->r_rename_table[iq_entry.des_rd];
+                //the phy is invalid now
+                cpu->phys_regs_valid[previous_rat_index] = 0;
+                //free physical register
+                //mark contents has  free
+                cpu->free_PR_list[previous_rat_index] = 0;
+
+                cpu->phys_regs[iq_entry.des_phy_reg] = cpu->intfu.result_buffer;
+                //the phy is valid now
+                cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
+                //rat update content is valid
+                cpu->rename_table_valid[iq_entry.des_rd] = 1;
+                //the r-rat entry is of rd is pointing to most recent phy_reg
+                cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
+                cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
             }
 
             break;
