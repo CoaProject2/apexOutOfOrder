@@ -35,6 +35,24 @@ typedef struct APEX_Instruction
     int imm;
 } APEX_Instruction;
 
+/* Format of  ROB ENTRY  */
+typedef struct ROB_ENTRY
+{
+	int pc; 
+	int des_rd;
+    int result; //result
+	int exception_codes;
+	int result_valid;
+	char opcode_str[128];
+	int des_phy_reg;
+    int instruction_type;
+    int src1;
+    int src2;
+    int src3;
+    int imm;
+    int mready;
+    
+} ROB_ENTRY;
 typedef struct IQ_ENTRY
 {
 	int pc;
@@ -74,6 +92,7 @@ typedef struct CPU_Stage
     int has_insn;
     int stalled;
     IQ_ENTRY iq_entry;
+    ROB_ENTRY *rob_entry;
 } CPU_Stage;
 
 
@@ -105,7 +124,11 @@ typedef struct APEX_CPU
 	// Index represents the PR and values 1- represents free,0 - represents occupied.
 	int free_PR_list[48];
 
-
+    ROB_ENTRY ROB[64];
+  
+    int rob_tail;
+    int rob_head;
+    int rob_current_instruction;
 
 
 	//Rename table to contain info with Index represents the  Physical Register.
@@ -128,7 +151,11 @@ typedef struct APEX_CPU
     CPU_Stage mul3 ;
     CPU_Stage jbu1 ;
     CPU_Stage jbu2 ; 
+    
+    CPU_Stage memory1 ;
+    CPU_Stage memory2 ;
     IQ_ENTRY iq_entry;
+
 } APEX_CPU;
 
 APEX_Instruction *create_code_memory(const char *filename, int *size);

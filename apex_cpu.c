@@ -223,6 +223,7 @@ APEX_fetch(APEX_CPU *cpu)
             cpu->fetch.rd = current_ins->rd;
             cpu->fetch.rs1 = current_ins->rs1;
             cpu->fetch.rs2 = current_ins->rs2;
+            cpu->fetch.rs3 = current_ins->rs3;
             cpu->fetch.imm = current_ins->imm;
 
             if (!cpu->decode.stalled)
@@ -272,9 +273,10 @@ APEX_decode(APEX_CPU *cpu)
 
             int rs1_physical = cpu->decode.rs1 > -1 ? cpu->rename_table[cpu->decode.rs1] : -1;
             int rs2_physical = cpu->decode.rs2 > -1 ? cpu->rename_table[cpu->decode.rs2] : -1;
-
-            //  printf("rs1_physical= %d rs2_physical %d", rs1_physical, rs2_physical);
-
+            int rs3_physical = -1;
+            if (cpu->decode.opcode == OPCODE_STR)
+                rs3_physical = cpu->decode.rs3 > -1 ? cpu->rename_table[cpu->decode.rs3] : -1;
+           
             for (int i = 0; i < 48; i++)
             {
                 if (cpu->free_PR_list[i] == 0)
@@ -297,113 +299,375 @@ APEX_decode(APEX_CPU *cpu)
             {
                 stagestalled = 1;
             }
-
-            for (int i = 0; i < 24; i++)
+            int i = 0;
+            for (i = 0; i < 24; i++)
             {
-                /*iq means iq entry occupied*/
-                if (cpu->freeiq[i] >= 1)
+                /*iq means iq entry occupied o means free 1 means occupied*/
+                if (cpu->freeiq[i] < 1)
                 {
                     break;
                 }
-                if (i == 24)
-                {
-                    stagestalled = 1;
-                }
             }
-            if (stagestalled == 0)
+            if (i == 24)
             {
-                /*fill the iq entry*/
-                for (int i = 0; i < 24; i++)
+                stagestalled = 1;
+            }
+
+            if (cpu->decode.opcode != OPCODE_LOAD && cpu->decode.opcode != OPCODE_LDR && cpu->decode.opcode != OPCODE_STORE && cpu->decode.opcode != OPCODE_STR)
+            {
+                if (stagestalled == 0)
                 {
-                    if (cpu->freeiq[i] == 0)
+                    /*fill the iq entry*/
+                    for (int i = 0; i < 24; i++)
                     {
-                        iq_entry = &cpu->IssueQueue[i];
-                        cpu->freeiq[i] = 1;
+                        if (cpu->freeiq[i] == 0)
+                        {
+                            iq_entry = &cpu->IssueQueue[i];
+                            cpu->freeiq[i] = 1;
+                            break;
+                        }
+                    }
+                    iq_entry->opcode = cpu->decode.opcode;
+                    strcpy(iq_entry->opcode_str, cpu->decode.opcode_str);
+                    iq_entry->src1 = rs1_physical;
+                    //cpu->phys_regs[rs1_physical]
+                    iq_entry->src2 = rs2_physical;
+                    //cpu->phys_regs[rs2_physical]
+                    // iq_entry->src2_tag = rs2_physical;
+                    //  iq_entry->src1_tag = rs1_physical;
+                    // iq_entry->src2_ready = cpu->phys_regs_valid[rs1_physical];
+                    // iq_entry->src1_ready = cpu->phys_regs_valid[rs2_physical];
+                    iq_entry->imm = cpu->decode.imm;
+                    iq_entry->pc = cpu->decode.pc;
+                    iq_entry->des_phy_reg = first_free_phy_reg;
+                    iq_entry->des_rd = cpu->decode.rd;
+                    switch (cpu->decode.opcode)
+                    {
+
+                    case OPCODE_ADD:
+                    case OPCODE_SUB:
+                    case OPCODE_MOVC:
+                    case OPCODE_CMP:
+                    {
+
+                        /*3 for ifu*/
+                        iq_entry->fu_type = 3;
+                        cpu->decode.has_insn = FALSE;
                         break;
                     }
-                }
-                iq_entry->opcode = cpu->decode.opcode;
-                strcpy(iq_entry->opcode_str, cpu->decode.opcode_str);
-                iq_entry->src1 = rs1_physical;
-                //cpu->phys_regs[rs1_physical]
-                iq_entry->src2 = rs2_physical;
-                //cpu->phys_regs[rs2_physical]
-                // iq_entry->src2_tag = rs2_physical;
-                //  iq_entry->src1_tag = rs1_physical;
-                // iq_entry->src2_ready = cpu->phys_regs_valid[rs1_physical];
-                // iq_entry->src1_ready = cpu->phys_regs_valid[rs2_physical];
-                iq_entry->imm = cpu->decode.imm;
-                iq_entry->pc = cpu->decode.pc;
-                iq_entry->des_phy_reg = first_free_phy_reg;
-                iq_entry->des_rd = cpu->decode.rd;
-                switch (cpu->decode.opcode)
-                {
-
-                case OPCODE_ADD:
-                case OPCODE_SUB:
-                case OPCODE_MOVC:
-                case OPCODE_CMP:
-                {
-
-                    /*3 for ifu*/
-                    iq_entry->fu_type = 3;
-                    cpu->decode.has_insn=FALSE;
-                    break;
-                }
-                case OPCODE_MUL:
-                {
-                    iq_entry->fu_type = 4;
-                    cpu->decode.has_insn=FALSE;
-                    break;
-                }
-                case OPCODE_JUMP:
-                case OPCODE_JAL:
-                {
-                    cpu->is_stalled=1;
-                    iq_entry->fu_type = 5;
-                    cpu->decode.has_insn=FALSE;
-                    break;
-                }
-                
-                case OPCODE_BZ:
-                {
-                    if(cpu->zero_flag == TRUE){
-                       cpu->is_stalled=1; 
+                    case OPCODE_MUL:
+                    {
+                        iq_entry->fu_type = 4;
+                        cpu->decode.has_insn = FALSE;
+                        break;
                     }
-                    iq_entry->fu_type = 5;
-                    cpu->decode.has_insn=FALSE;
-                    break;
-                }
-                case OPCODE_BNZ:
-                {
-
-                    if(cpu->zero_flag == FALSE){
-                       cpu->is_stalled=1; 
+                    case OPCODE_JUMP:
+                    case OPCODE_JAL:
+                    {
+                        cpu->is_stalled = 1;
+                        iq_entry->fu_type = 5;
+                        cpu->decode.has_insn = FALSE;
+                        break;
                     }
-                    iq_entry->fu_type = 5;
-                    cpu->decode.has_insn=FALSE;
-                    
-                    break;
-                }
-                
-                case OPCODE_HALT:
-                
-                {
-                    /* HALT/NOP doesn't have register operands */
-                    iq_entry->fu_type = 3;
-                    cpu->decode.has_insn=FALSE;
-                    break;
-                }
+
+                    case OPCODE_BZ:
+                    {
+                        if (cpu->zero_flag == TRUE)
+                        {
+                            cpu->is_stalled = 1;
+                        }
+                        iq_entry->fu_type = 5;
+                        cpu->decode.has_insn = FALSE;
+                        break;
+                    }
+                    case OPCODE_BNZ:
+                    {
+
+                        if (cpu->zero_flag == FALSE)
+                        {
+                            cpu->is_stalled = 1;
+                        }
+                        iq_entry->fu_type = 5;
+                        cpu->decode.has_insn = FALSE;
+
+                        break;
+                    }
+
+                    case OPCODE_HALT:
+
+                    {
+                        /* HALT/NOP doesn't have register operands */
+                        iq_entry->fu_type = 3;
+                        cpu->decode.has_insn = FALSE;
+                        break;
+                    }
+                    }
                 }
             }
+            else
+             {
+                switch (cpu->decode.opcode)
+            {
+            case OPCODE_LDR:
+            {
+                if (cpu->phys_regs_valid[rs1_physical] == 1 && cpu->phys_regs_valid[rs2_physical] == 1)
+                {
+                    ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
+                    rob_entry->pc = cpu->decode.pc;
+                    rob_entry->src1 = rs1_physical;
+                    rob_entry->src2 = rs2_physical;
+                    rob_entry->des_rd = cpu->decode.rd;
+                    rob_entry->exception_codes = 0;
+                    rob_entry->result_valid = 0;
+                    rob_entry->result = 0;
+                    rob_entry->instruction_type = cpu->decode.opcode;
+                    strcpy(rob_entry->opcode_str, cpu->decode.opcode_str);
+                    rob_entry->des_phy_reg = first_free_phy_reg;
+                    rob_entry->mready = 1;
+
+                    cpu->rob_current_instruction = cpu->rob_tail;
+                    cpu->rob_tail = (cpu->rob_tail + 1) % 64;
+                }
+
+                else
+                {
+                    //create entry in iq and wait for The ready bit
+                }
+                break;
+            }
+            case OPCODE_LOAD:
+            {
+                if (cpu->phys_regs_valid[rs1_physical] == 1)
+                {
+                    ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
+                    rob_entry->pc = cpu->decode.pc;
+                    rob_entry->src1 = rs1_physical;
+                    rob_entry->imm = cpu->decode.imm;
+                    rob_entry->des_rd = cpu->decode.rd;
+                    rob_entry->exception_codes = 0;
+                    rob_entry->result_valid = 0;
+                    rob_entry->result = 0;
+                    rob_entry->instruction_type = cpu->decode.opcode;
+                    strcpy(rob_entry->opcode_str, cpu->decode.opcode_str);
+                    rob_entry->des_phy_reg = first_free_phy_reg;
+                    rob_entry->mready = 1;
+                    cpu->rob_current_instruction = cpu->rob_tail;
+                    cpu->rob_tail = (cpu->rob_tail + 1) % 64;
+                }
+                else
+                {
+                    //create entry in iq and wait for The ready bit
+                }
+                break;
+            }
+            case OPCODE_STORE:
+            {
+
+                if (cpu->phys_regs_valid[rs1_physical] == 1 && cpu->phys_regs_valid[rs2_physical] == 1)
+                {
+                    ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
+                    rob_entry->pc = cpu->decode.pc;
+                    rob_entry->src1 = rs1_physical;
+                    rob_entry->src2 = rs2_physical;
+                    rob_entry->exception_codes = 0;
+                    rob_entry->result_valid = 0;
+                    rob_entry->result = 0;
+                    rob_entry->instruction_type = cpu->decode.opcode;
+                    strcpy(rob_entry->opcode_str, cpu->decode.opcode_str);
+                    rob_entry->des_phy_reg = first_free_phy_reg;
+                    rob_entry->mready = 1;
+                    cpu->rob_current_instruction = cpu->rob_tail;
+                    cpu->rob_tail = (cpu->rob_tail + 1) % 64;
+                }
+                else
+                {
+                    //create entry in iq and wait for The mready bit
+                }
+                break;
+            }
+            case OPCODE_STR:
+            {
+                if (cpu->phys_regs_valid[rs1_physical] == 1 && cpu->phys_regs_valid[rs2_physical] == 1 && cpu->phys_regs_valid[rs3_physical] == 1)
+                {
+                    ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
+                    rob_entry->pc = cpu->decode.pc;
+                    rob_entry->src1 = rs1_physical;
+                    rob_entry->src2 = rs2_physical;
+                    rob_entry->src3 = rs3_physical;
+                    rob_entry->exception_codes = 0;
+                    rob_entry->result_valid = 0;
+                    rob_entry->result = 0;
+                    rob_entry->instruction_type = cpu->decode.opcode;
+                    strcpy(rob_entry->opcode_str, cpu->decode.opcode_str);
+                    rob_entry->des_phy_reg = first_free_phy_reg;
+                    rob_entry->mready = 1;
+                    cpu->rob_current_instruction = cpu->rob_tail;
+                    cpu->rob_tail = (cpu->rob_tail + 1) % 64;
+                }
+                else
+                {
+                    //create entry in iq and wait for The ready bit
+                }
+                break;
+            }
+            }
+             }
         }
+     
+
+    if (ENABLE_DEBUG_MESSAGES)
+    {
+        print_stage_content("Instruction at decode____________Stage--->", &cpu->decode);
+    }
+    }
+}
+/*
+ * ROB Stage of APEX Pipeline
+ *
+ * Note: You are free to edit this function according to your implementation
+ */
+static void
+APEX_ROB(APEX_CPU *cpu)
+{
+    ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_head];
+    ROB_ENTRY *selectedrobentry = rob_entry;
+    if (selectedrobentry->mready == 1 && cpu->rob_head < cpu->rob_tail && cpu->rob_current_instruction < cpu->rob_tail)
+    {
+        cpu->memory1.rob_entry = selectedrobentry;
+
+        cpu->memory1.has_insn = TRUE;
+        cpu->rob_current_instruction = (cpu->rob_current_instruction + 1) % 64;
+    }
+    if (ENABLE_DEBUG_MESSAGES)
+    {
+        printf("Instruction at ROB____________Stage--->");
+    }
+}
+
+static void
+APEX_memory1(APEX_CPU *cpu)
+{
+    ROB_ENTRY *selectedrobentry = cpu->memory1.rob_entry;
+    if (cpu->memory1.has_insn && selectedrobentry->mready == 1)
+    {
+        switch (selectedrobentry->instruction_type)
+        {
+        case OPCODE_LDR:
+        {
+            // LDR dest ,SRC2, SRC3
+            //dest <- src2+src3
+            cpu->memory1.memory_address = cpu->phys_regs[selectedrobentry->src2] + cpu->phys_regs[selectedrobentry->src1];
+            // dest reg <- mem addr[memory_address]
+            break;
+        }
+        case OPCODE_LOAD:
+        { // load r1,r2,#10
+            cpu->memory1.memory_address = cpu->phys_regs[selectedrobentry->src2] + selectedrobentry->imm;
+            break;
+        }
+        case OPCODE_STR:
+        {
+            // rs1,rs2,r3
+            // mem addr[memory_address] <- src1
+            cpu->memory1.memory_address = cpu->phys_regs[selectedrobentry->src2] + cpu->phys_regs[selectedrobentry->src3];
+            break;
+        }
+        case OPCODE_STORE:
+        {
+            // mem addr[memory_address] <- src1
+            cpu->memory1.memory_address = cpu->phys_regs[selectedrobentry->src2] + selectedrobentry->imm;
+            break;
+        }
+        }
+        cpu->memory2 = cpu->memory1;
+        cpu->memory1.has_insn = FALSE;
 
         if (ENABLE_DEBUG_MESSAGES)
         {
-            print_stage_content("Instruction at decode____________Stage--->", &cpu->decode);
+            printf("Instruction at memory1--->");
+            printf("\n");
+            printf("\n");
         }
     }
 }
+static void
+APEX_memory2(APEX_CPU *cpu)
+{
+    ROB_ENTRY *selectedrobentry = cpu->memory2.rob_entry;
+    if (cpu->memory2.has_insn && selectedrobentry->mready == 1)
+    {
+
+        switch (selectedrobentry->instruction_type)
+        {
+        case OPCODE_LDR:
+        case OPCODE_LOAD:
+        {
+            // LDR dest ,SRC1, SRC2
+            //dest <- src1+src2
+            // dest reg <- mem addr[memory_address]
+            cpu->memory2.result_buffer = cpu->data_memory[cpu->memory2.memory_address];
+            //instruction reirenemt logic
+            //   cpu->phys_regs[selectedrobentry->des_phy_reg] = cpu->memory2.result_buffer;
+
+            if (cpu->r_rename_table[selectedrobentry->des_rd] == 0 || cpu->r_rename_table[selectedrobentry->des_rd] == -1)
+            {
+
+                //instruction retriement process
+                //iq_entry.des_phy_reg ==freed entry
+
+                cpu->phys_regs[selectedrobentry->des_phy_reg] = cpu->memory2.result_buffer;
+                //the phy is valid now
+                cpu->phys_regs_valid[selectedrobentry->des_phy_reg] = 1;
+
+                //rat update content is valid
+                cpu->rename_table_valid[selectedrobentry->des_rd] = 1;
+
+                //the r-rat entry is of rd is pointing to most recent phy_reg
+                cpu->r_rename_table[selectedrobentry->des_rd] = selectedrobentry->des_phy_reg;
+                cpu->r_rename_table_valid[selectedrobentry->des_rd] = 1;
+            }
+            else
+            {
+                int previous_rat_index = cpu->r_rename_table[selectedrobentry->des_rd];
+                //the phy is invalid now
+                cpu->phys_regs_valid[previous_rat_index] = 0;
+                //free physical register
+                //mark contents has  free
+                cpu->free_PR_list[previous_rat_index] = 0;
+
+                cpu->phys_regs[selectedrobentry->des_phy_reg] = cpu->memory2.result_buffer;
+                //the phy is valid now
+                cpu->phys_regs_valid[selectedrobentry->des_phy_reg] = 1;
+                //rat update content is valid
+                cpu->rename_table_valid[selectedrobentry->des_rd] = 1;
+                //the r-rat entry is of rd is pointing to most recent phy_reg
+                cpu->r_rename_table[selectedrobentry->des_rd] = selectedrobentry->des_phy_reg;
+                cpu->r_rename_table_valid[selectedrobentry->des_rd] = 1;
+            }
+            break;
+        }
+        case OPCODE_STR:
+        case OPCODE_STORE:
+
+        {
+            // mem addr[memory_address] <- src1
+            //  cpu->data_memory[cpu->memory2.memory_address] = cpu->memory2.rs1_value;
+            cpu->data_memory[cpu->memory2.memory_address] = cpu->phys_regs[selectedrobentry->src1];
+            break;
+        }
+        }
+        cpu->rob_head = (cpu->rob_head + 1) % 64;
+        cpu->memory2 = cpu->memory1;
+        cpu->memory2.has_insn = FALSE;
+        if (ENABLE_DEBUG_MESSAGES)
+        {
+            printf("Instruction at memory2--->");
+            printf("\n");
+            printf("\n");
+        }
+    }
+}
+
 /*
  * issuequeue Stage of APEX Pipeline
  *
@@ -489,7 +753,7 @@ APEX_issuequeue(APEX_CPU *cpu)
         {
             selectedbranchfuiqentry = iqe;
             branchfuissued = issuequequeindex;
-                break;
+            break;
         }
         case OPCODE_HALT:
         {
@@ -559,7 +823,7 @@ APEX_intfu(APEX_CPU *cpu)
         case OPCODE_ADD:
         {
             cpu->intfu.result_buffer = cpu->phys_regs[iq_entry.src1] + cpu->phys_regs[iq_entry.src2];
-            
+
             instruction_retirement(cpu, iq_entry);
             break;
         }
@@ -581,7 +845,6 @@ APEX_intfu(APEX_CPU *cpu)
         {
             cpu->intfu.result_buffer = iq_entry.src1 + iq_entry.imm;
 
-            
             instruction_retirement(cpu, iq_entry);
 
             break;
@@ -605,14 +868,14 @@ APEX_intfu(APEX_CPU *cpu)
         case OPCODE_AND:
         {
             cpu->intfu.result_buffer = cpu->phys_regs[iq_entry.src1] & cpu->phys_regs[iq_entry.src2];
-            
+
             instruction_retirement(cpu, iq_entry);
             break;
         }
         case OPCODE_OR:
         {
             cpu->intfu.result_buffer = cpu->phys_regs[iq_entry.src1] | cpu->phys_regs[iq_entry.src2];
-            
+
             instruction_retirement(cpu, iq_entry);
             break;
 
@@ -621,7 +884,7 @@ APEX_intfu(APEX_CPU *cpu)
         case OPCODE_XOR:
         {
             cpu->intfu.result_buffer = cpu->phys_regs[iq_entry.src1] ^ cpu->phys_regs[iq_entry.src2];
-            
+
             instruction_retirement(cpu, iq_entry);
             break;
 
@@ -650,11 +913,9 @@ APEX_intfu(APEX_CPU *cpu)
         case OPCODE_HALT:
         {
             /* Stop fetching new instructions if HALT is fetched */
-        
+
             /* Stop the APEX simulator */
             return TRUE;
-    
-        
         }
         }
         iq_entry.finishedstage = INTFU;
@@ -796,16 +1057,18 @@ int APEX_jbu1(APEX_CPU *cpu)
         }
         case OPCODE_BZ:
         {
-            if(cpu->zero_flag == TRUE){
-             cpu->jbu1.result_buffer = iq_entry.pc  + iq_entry.imm;
+            if (cpu->zero_flag == TRUE)
+            {
+                cpu->jbu1.result_buffer = iq_entry.pc + iq_entry.imm;
             }
-            
+
             break;
         }
         case OPCODE_BNZ:
         {
-            if(cpu->zero_flag == FALSE){
-             cpu->jbu1.result_buffer = iq_entry.pc  + iq_entry.imm;
+            if (cpu->zero_flag == FALSE)
+            {
+                cpu->jbu1.result_buffer = iq_entry.pc + iq_entry.imm;
             }
             break;
         }
@@ -833,68 +1096,69 @@ int APEX_jbu2(APEX_CPU *cpu)
         {
         case OPCODE_BZ:
         {
-            if(cpu->zero_flag ==TRUE){
-            cpu->pc=cpu->jbu2.result_buffer ;
-            cpu->is_stalled=0; // 1 means stalled
+            if (cpu->zero_flag == TRUE)
+            {
+                cpu->pc = cpu->jbu2.result_buffer;
+                cpu->is_stalled = 0; // 1 means stalled
             }
             break;
         }
         case OPCODE_BNZ:
         {
-            if(cpu->zero_flag == FALSE){
-             cpu->pc=cpu->jbu2.result_buffer ;
-             cpu->is_stalled=0; // 1 means stalled
+            if (cpu->zero_flag == FALSE)
+            {
+                cpu->pc = cpu->jbu2.result_buffer;
+                cpu->is_stalled = 0; // 1 means stalled
             }
             break;
         }
         case OPCODE_JAL:
         {
-            cpu->is_stalled=0; // 1 means stalled
-            cpu->pc=cpu->jbu2.result_buffer ;
+            cpu->is_stalled = 0; // 1 means stalled
+            cpu->pc = cpu->jbu2.result_buffer;
 
             if (cpu->r_rename_table[iq_entry.des_rd] == 0 || cpu->r_rename_table[iq_entry.des_rd] == -1)
-    {
+            {
 
-        //instruction retriement process
-        //iq_entry.des_phy_reg ==freed entry
+                //instruction retriement process
+                //iq_entry.des_phy_reg ==freed entry
 
-        cpu->phys_regs[iq_entry.des_phy_reg] = cpu->jbu2.rd; //change rd
-        //the phy is valid now
-        cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
+                cpu->phys_regs[iq_entry.des_phy_reg] = cpu->jbu2.rd; //change rd
+                //the phy is valid now
+                cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
 
-        //rat update content is valid
-        cpu->rename_table_valid[iq_entry.des_rd] = 1;
+                //rat update content is valid
+                cpu->rename_table_valid[iq_entry.des_rd] = 1;
 
-        //the r-rat entry is of rd is pointing to most recent phy_reg
-        cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
-        cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
-    }
-    else
-    {
-        int previous_rat_index = cpu->r_rename_table[iq_entry.des_rd];
-        //the phy is invalid now
-        cpu->phys_regs_valid[previous_rat_index] = 0;
-        //free physical register
-        //mark contents has  free
-        cpu->free_PR_list[previous_rat_index] = 0;
+                //the r-rat entry is of rd is pointing to most recent phy_reg
+                cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
+                cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
+            }
+            else
+            {
+                int previous_rat_index = cpu->r_rename_table[iq_entry.des_rd];
+                //the phy is invalid now
+                cpu->phys_regs_valid[previous_rat_index] = 0;
+                //free physical register
+                //mark contents has  free
+                cpu->free_PR_list[previous_rat_index] = 0;
 
-        cpu->phys_regs[iq_entry.des_phy_reg] = cpu->jbu2.rd;
-        //the phy is valid now
-        cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
-        //rat update content is valid
-        cpu->rename_table_valid[iq_entry.des_rd] = 1;
-        //the r-rat entry is of rd is pointing to most recent phy_reg
-        cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
-        cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
-    }
-
+                cpu->phys_regs[iq_entry.des_phy_reg] = cpu->jbu2.rd;
+                //the phy is valid now
+                cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
+                //rat update content is valid
+                cpu->rename_table_valid[iq_entry.des_rd] = 1;
+                //the r-rat entry is of rd is pointing to most recent phy_reg
+                cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
+                cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
+            }
 
             break;
         }
         case OPCODE_JUMP:
         {
-         cpu->is_stalled=0;
-            cpu->pc=cpu->jbu2.result_buffer ;
+            cpu->is_stalled = 0;
+            cpu->pc = cpu->jbu2.result_buffer;
             break;
         }
         }
@@ -939,7 +1203,7 @@ APEX_cpu_init(const char *filename)
     memset(cpu->regs, 0, sizeof(int) * REG_FILE_SIZE);
     memset(cpu->data_memory, 0, sizeof(int) * DATA_MEMORY_SIZE);
     cpu->single_step = ENABLE_SINGLE_STEP;
-    cpu->zero_flag=-1;
+    cpu->zero_flag = -1;
     /* Parse input file and create code memory */
     cpu->code_memory = create_code_memory(filename, &cpu->code_memory_size);
 
@@ -996,20 +1260,26 @@ void APEX_cpu_run(APEX_CPU *cpu)
 
     while (TRUE)
     {
+        int breaktrue=0;
         if (ENABLE_DEBUG_MESSAGES)
         {
             printf("--------------------------------------------\n");
             printf("Clock Cycle #: %d\n", cpu->clock);
             printf("--------------------------------------------\n");
         }
+
+        APEX_memory2(cpu);
+        APEX_memory1(cpu);
         APEX_jbu2(cpu);
         APEX_jbu1(cpu);
         APEX_mul3(cpu);
         APEX_mul2(cpu);
         APEX_mul1(cpu);
-        if (APEX_intfu(cpu)){
-            break;
+        if (APEX_intfu(cpu))
+        {
+            breaktrue=1;
         }
+        APEX_ROB(cpu);
         APEX_issuequeue(cpu);
         APEX_decode(cpu);
         APEX_fetch(cpu);
@@ -1033,6 +1303,9 @@ void APEX_cpu_run(APEX_CPU *cpu)
         }
 
         cpu->clock++;
+        if(breaktrue) {
+            break;
+        }
     }
 }
 
