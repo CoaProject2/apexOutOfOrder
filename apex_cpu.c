@@ -276,6 +276,11 @@ APEX_fetch(APEX_CPU *cpu)
             }
         }
     }
+    else if (ENABLE_DEBUG_MESSAGES)
+    {
+        printf("Instruction at fetch____________Stage---empty>");
+        printf("\n");
+    }
 }
 
 /*
@@ -314,7 +319,7 @@ APEX_decode(APEX_CPU *cpu)
                 //rob end
                 return;
             }
-            else if (cpu->decode.opcode == OPCODE_BZ ||cpu->decode.opcode == OPCODE_BNZ )
+            else if (cpu->decode.opcode == OPCODE_BZ || cpu->decode.opcode == OPCODE_BNZ)
             {
                 int i = 0;
                 for (i = 0; i < 24; i++)
@@ -360,19 +365,21 @@ APEX_decode(APEX_CPU *cpu)
                     iq_entry->rob_tail = cpu->rob_tail; // rob index assigned
                     cpu->rob_tail = (cpu->rob_tail + 1) % 64;
                     //rob end
-                    if(cpu->decode.opcode == OPCODE_BZ) {
-                    if (cpu->zero_flag == TRUE)
+                    if (cpu->decode.opcode == OPCODE_BZ)
                     {
-                        cpu->is_stalled = 1;
-                    } 
+                        if (cpu->zero_flag == TRUE)
+                        {
+                            cpu->is_stalled = 1;
+                        }
                     }
-                    if(cpu->decode.opcode == OPCODE_BNZ) {
-                    if (cpu->zero_flag == FALSE)
+                    if (cpu->decode.opcode == OPCODE_BNZ)
                     {
-                        cpu->is_stalled = 1;
-                    } 
+                        if (cpu->zero_flag == FALSE)
+                        {
+                            cpu->is_stalled = 1;
+                        }
                     }
-                    
+
                     iq_entry->fu_type = 5;
                     cpu->decode.has_insn = FALSE;
 
@@ -760,6 +767,11 @@ APEX_decode(APEX_CPU *cpu)
             print_stage_content("Instruction at decode____________Stage--->", &cpu->decode);
         }
     }
+    else if (ENABLE_DEBUG_MESSAGES)
+    {
+        printf("Instruction at decode____________Stage---empty>");
+        printf("\n");
+    }
 }
 
 static void
@@ -807,6 +819,11 @@ APEX_memory1(APEX_CPU *cpu)
             printf("\n");
         }
     }
+    else if (ENABLE_DEBUG_MESSAGES)
+    {
+        printf("Instruction at memory1____________Stage---empty>");
+        printf("\n");
+    }
 }
 static void
 APEX_memory2(APEX_CPU *cpu)
@@ -838,7 +855,7 @@ APEX_memory2(APEX_CPU *cpu)
             // mem addr[memory_address] <- src1
             //  cpu->data_memory[cpu->memory2.memory_address] = cpu->phys_regs[selectedrobentry->src1];
             cpu->memory2.result_buffer = cpu->phys_regs[selectedrobentry->src1];
-              //start
+            //start
             // ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
             selectedrobentry->exception_codes = 0;
             selectedrobentry->result_valid = 1;
@@ -856,6 +873,11 @@ APEX_memory2(APEX_CPU *cpu)
             printf("\n");
             printf("\n");
         }
+    }
+    else if (ENABLE_DEBUG_MESSAGES)
+    {
+        printf("Instruction at memory2____________Stage---empty>");
+        printf("\n");
     }
 }
 
@@ -1053,7 +1075,7 @@ APEX_issuequeue(APEX_CPU *cpu)
     }
     if (robissued > -1)
     {
-       // IQ_ENTRY entry = selectedrobqentry;
+        // IQ_ENTRY entry = selectedrobqentry;
         //     ROB_ENTRY *rob_entry = &cpu->ROB[entry.rob_tail];
         //     rob_entry->mready = 1;
         cpu->memory1.has_insn = TRUE;
@@ -1082,8 +1104,6 @@ APEX_intfu(APEX_CPU *cpu)
             rob_entry->des_phy_reg = iq_entry.des_phy_reg;
             rob_entry->des_rd = iq_entry.des_rd;
             //end
-
-            //instruction_retirement(cpu, iq_entry); //commented
             break;
         }
         case OPCODE_SUB:
@@ -1105,7 +1125,6 @@ APEX_intfu(APEX_CPU *cpu)
             rob_entry->des_phy_reg = iq_entry.des_phy_reg;
             rob_entry->des_rd = iq_entry.des_rd;
             //end
-            //instruction_retirement(cpu, iq_entry);
             break;
         }
         case OPCODE_ADDL:
@@ -1120,7 +1139,6 @@ APEX_intfu(APEX_CPU *cpu)
             rob_entry->des_phy_reg = iq_entry.des_phy_reg;
             rob_entry->des_rd = iq_entry.des_rd;
             //end
-            //instruction_retirement(cpu, iq_entry);
 
             break;
         }
@@ -1145,7 +1163,6 @@ APEX_intfu(APEX_CPU *cpu)
             rob_entry->des_phy_reg = iq_entry.des_phy_reg;
             rob_entry->des_rd = iq_entry.des_rd;
             //end
-            //instruction_retirement(cpu, iq_entry);
             break;
         }
         case OPCODE_AND:
@@ -1160,7 +1177,6 @@ APEX_intfu(APEX_CPU *cpu)
             rob_entry->des_phy_reg = iq_entry.des_phy_reg;
             rob_entry->des_rd = iq_entry.des_rd;
             //end
-            //instruction_retirement(cpu, iq_entry);
             break;
         }
         case OPCODE_OR:
@@ -1175,8 +1191,6 @@ APEX_intfu(APEX_CPU *cpu)
             rob_entry->des_phy_reg = iq_entry.des_phy_reg;
             rob_entry->des_rd = iq_entry.des_rd;
             //end
-            //instruction_retirement(cpu, iq_entry);
-
             break;
         }
         case OPCODE_XOR:
@@ -1190,7 +1204,6 @@ APEX_intfu(APEX_CPU *cpu)
             rob_entry->des_phy_reg = iq_entry.des_phy_reg;
             rob_entry->des_rd = iq_entry.des_rd;
             //end
-            //instruction_retirement(cpu, iq_entry);
 
             break;
         }
@@ -1213,7 +1226,6 @@ APEX_intfu(APEX_CPU *cpu)
             rob_entry->des_phy_reg = iq_entry.des_phy_reg;
             rob_entry->des_rd = iq_entry.des_rd;
             //end
-            //instruction_retirement(cpu, iq_entry);
             break;
         }
         case OPCODE_MOVC:
@@ -1229,7 +1241,6 @@ APEX_intfu(APEX_CPU *cpu)
             rob_entry->des_phy_reg = iq_entry.des_phy_reg;
             rob_entry->des_rd = iq_entry.des_rd;
             //end
-            //instruction_retirement(cpu, iq_entry);
             break;
         }
         case OPCODE_HALT:
@@ -1250,6 +1261,11 @@ APEX_intfu(APEX_CPU *cpu)
             printf("%-15s: pc(%d) %s", "intfu ", iq_entry.pc, iq_entry.opcode_str);
             printf("\n");
         }
+    }
+    else if (ENABLE_DEBUG_MESSAGES)
+    {
+        printf("Instruction at intfu____________Stage---empty>");
+        printf("\n");
     }
     return 0;
 }
@@ -1277,7 +1293,11 @@ int APEX_mul1(APEX_CPU *cpu)
             printf("\n");
         }
     }
-
+    else if (ENABLE_DEBUG_MESSAGES)
+    {
+        printf("Instruction at mul1____________Stage---empty>");
+        printf("\n");
+    }
     return 0;
 }
 
@@ -1300,6 +1320,11 @@ int APEX_mul2(APEX_CPU *cpu)
             printf("%-15s: pc(%d) ", "mul2", iq_entry.pc);
             printf("\n");
         }
+    }
+    else if (ENABLE_DEBUG_MESSAGES)
+    {
+        printf("Instruction at mul2____________Stage---empty>");
+        printf("\n");
     }
     return 0;
 }
@@ -1330,6 +1355,11 @@ int APEX_mul3(APEX_CPU *cpu)
             printf("%-15s: pc(%d) ", "mul3", iq_entry.pc);
             printf("\n");
         }
+    }
+    else if (ENABLE_DEBUG_MESSAGES)
+    {
+        printf("Instruction at mul3____________Stage---empty>");
+        printf("\n");
     }
     return 0;
 }
@@ -1381,6 +1411,11 @@ int APEX_jbu1(APEX_CPU *cpu)
             printf("%-15s: pc(%d) ", "jbu1", iq_entry.pc);
             printf("\n");
         }
+    }
+    else if (ENABLE_DEBUG_MESSAGES)
+    {
+        printf("Instruction at jbu1____________Stage---empty>");
+        printf("\n");
     }
     return 0;
 }
@@ -1467,6 +1502,11 @@ int APEX_jbu2(APEX_CPU *cpu)
             printf("\n");
         }
     }
+    else if (ENABLE_DEBUG_MESSAGES)
+    {
+        printf("Instruction at jbu2____________Stage---empty>");
+        printf("\n");
+    }
     return 0;
 }
 int APEX_instruction_commitment(APEX_CPU *cpu)
@@ -1475,62 +1515,66 @@ int APEX_instruction_commitment(APEX_CPU *cpu)
     ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_head];
     ROB_ENTRY *selectedrobentry = rob_entry;
     while (selectedrobentry->result_valid)
-     {
-    if (selectedrobentry->result_valid && (selectedrobentry->instruction_type == OPCODE_STR || selectedrobentry->instruction_type == OPCODE_STORE))
     {
-        //  cpu->data_memory[cpu->memory2.memory_address]=rob_entry->result;
-        cpu->data_memory[rob_entry->des_phy_reg] = rob_entry->result;
-        cpu->rob_head = (cpu->rob_head + 1) % 64;
-    }
-    else if (selectedrobentry->result_valid && (selectedrobentry->instruction_type == OPCODE_ADD || selectedrobentry->instruction_type == OPCODE_LOAD || selectedrobentry->instruction_type == OPCODE_LDR ||
-                                                selectedrobentry->instruction_type == OPCODE_SUB || selectedrobentry->instruction_type == OPCODE_MOVC || selectedrobentry->instruction_type == OPCODE_CMP || selectedrobentry->instruction_type == OPCODE_MUL))
-    {
+        if (selectedrobentry->result_valid && (selectedrobentry->instruction_type == OPCODE_STR || selectedrobentry->instruction_type == OPCODE_STORE))
+        {
+            //  cpu->data_memory[cpu->memory2.memory_address]=rob_entry->result;
+            cpu->data_memory[rob_entry->des_phy_reg] = rob_entry->result;
+            cpu->rob_head = (cpu->rob_head + 1) % 64;
+        }
+        else if (selectedrobentry->result_valid && (selectedrobentry->instruction_type == OPCODE_ADD || selectedrobentry->instruction_type == OPCODE_LOAD || selectedrobentry->instruction_type == OPCODE_LDR ||
+                                                    selectedrobentry->instruction_type == OPCODE_SUB || selectedrobentry->instruction_type == OPCODE_MOVC || selectedrobentry->instruction_type == OPCODE_CMP || selectedrobentry->instruction_type == OPCODE_MUL))
+        {
 
-        instruction_retirement_intfu(cpu, selectedrobentry->result, selectedrobentry->des_rd, selectedrobentry->des_phy_reg);
-        cpu->rob_head = (cpu->rob_head + 1) % 64;
-    }
-    else if (selectedrobentry->result_valid && (selectedrobentry->instruction_type == OPCODE_BZ))
-    {
-        if (cpu->zero_flag == TRUE)
-        {
-            cpu->pc = selectedrobentry->result;
-            cpu->is_stalled = 0; // 1 means stalled
+            instruction_retirement_intfu(cpu, selectedrobentry->result, selectedrobentry->des_rd, selectedrobentry->des_phy_reg);
+            cpu->rob_head = (cpu->rob_head + 1) % 64;
         }
-        cpu->rob_head = (cpu->rob_head + 1) % 64;
-    }
-    else if (selectedrobentry->result_valid && (selectedrobentry->instruction_type == OPCODE_BNZ))
-    {
-        if (cpu->zero_flag == FALSE)
+        else if (selectedrobentry->result_valid && (selectedrobentry->instruction_type == OPCODE_BZ))
         {
-            cpu->pc = selectedrobentry->result;
-            cpu->is_stalled = 0; // 1 means stalled
+            if (cpu->zero_flag == TRUE)
+            {
+                cpu->pc = selectedrobentry->result;
+                cpu->is_stalled = 0; // 1 means stalled
+            }
+            cpu->rob_head = (cpu->rob_head + 1) % 64;
         }
-        cpu->rob_head = (cpu->rob_head + 1) % 64;
-    }
-    else if (selectedrobentry->result_valid && selectedrobentry->instruction_type == OPCODE_JAL)
-    {
-        cpu->is_stalled = 0; // 1 means stalled
-        cpu->pc = selectedrobentry->result;
-        //selectedrobentry->imm  //  to handle  JAL only
-        cpu->rob_head = (cpu->rob_head + 1) % 64;
-        instruction_retirement_intfu(cpu, selectedrobentry->imm, selectedrobentry->des_rd, selectedrobentry->des_phy_reg);
-    }
-    else if (selectedrobentry->result_valid && selectedrobentry->instruction_type == OPCODE_JUMP)
-    {
-        cpu->is_stalled = 0;
-        cpu->pc = selectedrobentry->result;
-        cpu->rob_head = (cpu->rob_head + 1) % 64;
-    }
-    if (ENABLE_DEBUG_MESSAGES)
-    {
-        printf("Instruction at ROB____________Stage---> %d", selectedrobentry->pc);
-        printf("\n");
-    }
-    if (selectedrobentry->instruction_type == OPCODE_HALT)
-    {
-        return TRUE;
-    }
-    selectedrobentry=&cpu->ROB[cpu->rob_head];
+        else if (selectedrobentry->result_valid && (selectedrobentry->instruction_type == OPCODE_BNZ))
+        {
+            if (cpu->zero_flag == FALSE)
+            {
+                cpu->pc = selectedrobentry->result;
+                cpu->is_stalled = 0; // 1 means stalled
+            }
+            cpu->rob_head = (cpu->rob_head + 1) % 64;
+        }
+        else if (selectedrobentry->result_valid && selectedrobentry->instruction_type == OPCODE_JAL)
+        {
+            cpu->is_stalled = 0; // 1 means stalled
+            cpu->pc = selectedrobentry->result;
+            //selectedrobentry->imm  //  to handle  JAL only
+            cpu->rob_head = (cpu->rob_head + 1) % 64;
+            instruction_retirement_intfu(cpu, selectedrobentry->imm, selectedrobentry->des_rd, selectedrobentry->des_phy_reg);
+        }
+        else if (selectedrobentry->result_valid && selectedrobentry->instruction_type == OPCODE_JUMP)
+        {
+            cpu->is_stalled = 0;
+            cpu->pc = selectedrobentry->result;
+            cpu->rob_head = (cpu->rob_head + 1) % 64;
+        }
+
+        if (ENABLE_DEBUG_MESSAGES)
+        {
+            printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
+            printf("Details of ROB Retired Instructions –\n");
+            printf("%s----[%d]", selectedrobentry->opcode_str, selectedrobentry->pc);
+            printf("\n");
+            printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
+        }
+        if (selectedrobentry->instruction_type == OPCODE_HALT)
+        {
+            return TRUE;
+        }
+        selectedrobentry = &cpu->ROB[cpu->rob_head];
     }
     //default
     return 0;
