@@ -599,6 +599,7 @@ APEX_decode(APEX_CPU *cpu)
                         ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
                         rob_entry->pc = cpu->decode.pc;
                         rob_entry->src1 = rs1_physical;
+                       
                         rob_entry->imm = cpu->decode.imm;
                         rob_entry->des_rd = cpu->decode.rd;
                         rob_entry->exception_codes = 0;
@@ -669,6 +670,9 @@ APEX_decode(APEX_CPU *cpu)
                             rob_entry->mready = 1;
                             cpu->rob_current_instruction = cpu->rob_tail;
                             cpu->rob_tail = (cpu->rob_tail + 1) % 64;
+                            cpu->memory1.rob_entry = rob_entry;
+
+                            cpu->memory1.has_insn = TRUE;
                         }
                         else
                         {
@@ -792,7 +796,7 @@ APEX_memory1(APEX_CPU *cpu)
         }
         case OPCODE_LOAD:
         { // load r1,r2,#10
-            cpu->memory1.memory_address = cpu->phys_regs[selectedrobentry->src2] + selectedrobentry->imm;
+            cpu->memory1.memory_address = cpu->phys_regs[selectedrobentry->src1] + selectedrobentry->imm;
             break;
         }
         case OPCODE_STR:
