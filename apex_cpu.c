@@ -134,7 +134,7 @@ static void printdatamemory(APEX_CPU *cpu)
 {
     printf("============== STATE OF DATA MEMORY =============\n");
 
-    for (int count = 33; count <= 36; count++)
+    for (int count = 1000; count <= 1005; count++)
     {
         printf("|           MEM[%d]       |     Data  Value=%d        |\n", count, cpu->data_memory[count]);
     }
@@ -197,14 +197,14 @@ static void print_rob(APEX_CPU *cpu)
     printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
     printf("Details of R-ROB  State --\n");
 
-    int a=cpu->rob_head;
-    while(a <cpu->rob_tail)
-     {
-    ROB_ENTRY *rob_entry = &cpu->ROB[a];
-  
-    printf("%s,R%d __pc[%d] \n  ", rob_entry->opcode_str, rob_entry->des_rd,rob_entry->pc);
-    
-    a++;
+    int a = cpu->rob_head;
+    while (a < cpu->rob_tail)
+    {
+        ROB_ENTRY *rob_entry = &cpu->ROB[a];
+
+        printf("%s,R%d __pc[%d] \n  ", rob_entry->opcode_str, rob_entry->des_rd, rob_entry->pc);
+
+        a++;
     }
     printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
 }
@@ -292,6 +292,8 @@ APEX_decode(APEX_CPU *cpu)
         /*create a iq entruy*/
         if (stagestalled == 0 && !cpu->is_stalled)
         {
+            IQ_ENTRY *iq_entry = NULL;
+
             if (cpu->decode.opcode == OPCODE_HALT)
             {
                 // halt should got to ROB, not IQ
@@ -312,57 +314,21 @@ APEX_decode(APEX_CPU *cpu)
                 //rob end
                 return;
             }
-            IQ_ENTRY *iq_entry = NULL;
-
-            int first_free_phy_reg = -1;
-
-            int rs1_physical = cpu->decode.rs1 > -1 ? cpu->rename_table[cpu->decode.rs1] : -1;
-            int rs2_physical = cpu->decode.rs2 > -1 ? cpu->rename_table[cpu->decode.rs2] : -1;
-            int rs3_physical = -1;
-            if (cpu->decode.opcode == OPCODE_STR)
-                rs3_physical = cpu->decode.rs3 > -1 ? cpu->rename_table[cpu->decode.rs3] : -1;
-
-            if (cpu->decode.opcode != OPCODE_BZ)
+            else if (cpu->decode.opcode == OPCODE_BZ ||cpu->decode.opcode == OPCODE_BNZ )
             {
-                for (int i = 0; i < 48; i++)
+                int i = 0;
+                for (i = 0; i < 24; i++)
                 {
-                    if (cpu->free_PR_list[i] == 0)
+                    /*iq means iq entry occupied o means free 1 means occupied*/
+                    if (cpu->freeiq[i] < 1)
                     {
-                        first_free_phy_reg = i;
-                        cpu->free_PR_list[i] = 1;
-                        cpu->phys_regs_valid[i] = 1;
                         break;
                     }
                 }
-            }
-
-            if (first_free_phy_reg > -1)
-            {
-                cpu->rename_table[cpu->decode.rd] = first_free_phy_reg;
-                //add a rename table entry made rename table contents as invalid
-                cpu->rename_table_valid[cpu->decode.rd] = 0;
-                cpu->phys_regs_valid[cpu->rename_table[cpu->decode.rd]] = 0;
-            }
-            if (!(first_free_phy_reg > -1))
-            {
-                stagestalled = 1;
-            }
-            int i = 0;
-            for (i = 0; i < 24; i++)
-            {
-                /*iq means iq entry occupied o means free 1 means occupied*/
-                if (cpu->freeiq[i] < 1)
+                if (i == 24)
                 {
-                    break;
+                    stagestalled = 1;
                 }
-            }
-            if (i == 24)
-            {
-                stagestalled = 1;
-            }
-
-            if (cpu->decode.opcode != OPCODE_LOAD && cpu->decode.opcode != OPCODE_LDR && cpu->decode.opcode != OPCODE_STORE && cpu->decode.opcode != OPCODE_STR)
-            {
                 if (stagestalled == 0)
                 {
                     /*fill the iq entry*/
@@ -377,202 +343,92 @@ APEX_decode(APEX_CPU *cpu)
                     }
                     iq_entry->opcode = cpu->decode.opcode;
                     strcpy(iq_entry->opcode_str, cpu->decode.opcode_str);
-                    iq_entry->src1 = rs1_physical;
-                    //cpu->phys_regs[rs1_physical]
-                    iq_entry->src2 = rs2_physical;
-                    //cpu->phys_regs[rs2_physical]
-                    // iq_entry->src2_tag = rs2_physical;
-                    //  iq_entry->src1_tag = rs1_physical;
-                    // iq_entry->src2_ready = cpu->phys_regs_valid[rs1_physical];
-                    // iq_entry->src1_ready = cpu->phys_regs_valid[rs2_physical];
                     iq_entry->imm = cpu->decode.imm;
                     iq_entry->pc = cpu->decode.pc;
-                    iq_entry->des_phy_reg = first_free_phy_reg;
-                    iq_entry->des_rd = cpu->decode.rd;
-                    switch (cpu->decode.opcode)
-                    {
 
-                    case OPCODE_ADD:
-                    case OPCODE_SUB:
-                    case OPCODE_MOVC:
-                    case OPCODE_CMP:
-                    {
-                        //rob
-                        ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
-                        rob_entry->pc = cpu->decode.pc;
-                        rob_entry->src1 = rs1_physical;
-                        rob_entry->src2 = rs2_physical;
-                        rob_entry->des_rd = cpu->decode.rd;
-                        rob_entry->exception_codes = 0;
-                        rob_entry->result_valid = 0;
-                        rob_entry->result = 0;
-                        rob_entry->mready = 0;
-                        rob_entry->instruction_type = cpu->decode.opcode;
-                        strcpy(rob_entry->opcode_str, cpu->decode.opcode_str);
-                        rob_entry->des_phy_reg = first_free_phy_reg;
-                        iq_entry->rob_tail = cpu->rob_tail; // rob index assigned
-                        cpu->rob_tail = (cpu->rob_tail + 1) % 64;
-                        //rob end
+                    //rob
+                    ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
+                    rob_entry->pc = cpu->decode.pc;
+                    rob_entry->imm = cpu->decode.imm;
 
-                        /*3 for ifu*/
-                        iq_entry->fu_type = 3;
-                        cpu->decode.has_insn = FALSE;
-                        break;
-                    }
-                    case OPCODE_MUL:
+                    rob_entry->exception_codes = 0;
+                    rob_entry->result_valid = 0;
+                    rob_entry->result = 0;
+                    rob_entry->mready = 0;
+                    rob_entry->instruction_type = cpu->decode.opcode;
+                    strcpy(rob_entry->opcode_str, cpu->decode.opcode_str);
+                    iq_entry->rob_tail = cpu->rob_tail; // rob index assigned
+                    cpu->rob_tail = (cpu->rob_tail + 1) % 64;
+                    //rob end
+                    if(cpu->decode.opcode == OPCODE_BZ) {
+                    if (cpu->zero_flag == TRUE)
                     {
-                        //rob
-                        ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
-                        rob_entry->pc = cpu->decode.pc;
-                        rob_entry->src1 = rs1_physical;
-                        rob_entry->src2 = rs2_physical;
-                        rob_entry->des_rd = cpu->decode.rd;
-                        rob_entry->exception_codes = 0;
-                        rob_entry->result_valid = 0;
-                        rob_entry->result = 0;
-                        rob_entry->mready = 0;
-                        rob_entry->instruction_type = cpu->decode.opcode;
-                        strcpy(rob_entry->opcode_str, cpu->decode.opcode_str);
-                        rob_entry->des_phy_reg = first_free_phy_reg;
-                        iq_entry->rob_tail = cpu->rob_tail; // rob index assigned
-                        cpu->rob_tail = (cpu->rob_tail + 1) % 64;
-                        //rob end
-                        iq_entry->fu_type = 4;
-                        cpu->decode.has_insn = FALSE;
-                        break;
-                    }
-                    case OPCODE_JUMP:
-                    case OPCODE_JAL:
-                    {
-                        //rob
-                        ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
-                        rob_entry->pc = cpu->decode.pc;
-                        rob_entry->src1 = rs1_physical;
-                        rob_entry->src2 = rs2_physical;
-                        rob_entry->des_rd = cpu->decode.rd;
-                        rob_entry->exception_codes = 0;
-                        rob_entry->result_valid = 0;
-                        rob_entry->result = 0;
-                        rob_entry->mready = 0;
-                        rob_entry->instruction_type = cpu->decode.opcode;
-                        strcpy(rob_entry->opcode_str, cpu->decode.opcode_str);
-                        rob_entry->des_phy_reg = first_free_phy_reg;
-                        iq_entry->rob_tail = cpu->rob_tail; // rob index assigned
-                        cpu->rob_tail = (cpu->rob_tail + 1) % 64;
-                        //rob end
-
                         cpu->is_stalled = 1;
-                        iq_entry->fu_type = 5;
-                        cpu->decode.has_insn = FALSE;
-                        break;
+                    } 
                     }
-
-                    case OPCODE_BZ:
+                    if(cpu->decode.opcode == OPCODE_BNZ) {
+                    if (cpu->zero_flag == FALSE)
                     {
-                        //rob
-                        ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
-                        rob_entry->pc = cpu->decode.pc;
-                        rob_entry->src1 = rs1_physical;
-                        rob_entry->src2 = rs2_physical;
-                        rob_entry->des_rd = cpu->decode.rd;
-                        rob_entry->exception_codes = 0;
-                        rob_entry->result_valid = 0;
-                        rob_entry->result = 0;
-                        rob_entry->mready = 0;
-                        rob_entry->instruction_type = cpu->decode.opcode;
-                        strcpy(rob_entry->opcode_str, cpu->decode.opcode_str);
-                        rob_entry->des_phy_reg = first_free_phy_reg;
-                        iq_entry->rob_tail = cpu->rob_tail; // rob index assigned
-                        cpu->rob_tail = (cpu->rob_tail + 1) % 64;
-                        //rob end
-                        if (cpu->zero_flag == TRUE)
-                        {
-                            cpu->is_stalled = 1;
-                        }
-                        iq_entry->fu_type = 5;
-                        cpu->decode.has_insn = FALSE;
-                        break;
+                        cpu->is_stalled = 1;
+                    } 
                     }
-                    case OPCODE_BNZ:
-                    {
+                    
+                    iq_entry->fu_type = 5;
+                    cpu->decode.has_insn = FALSE;
 
-                        //rob
-                        ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
-                        rob_entry->pc = cpu->decode.pc;
-                        rob_entry->src1 = rs1_physical;
-                        rob_entry->src2 = rs2_physical;
-                        rob_entry->des_rd = cpu->decode.rd;
-                        rob_entry->exception_codes = 0;
-                        rob_entry->result_valid = 0;
-                        rob_entry->result = 0;
-                        rob_entry->mready = 0;
-                        rob_entry->instruction_type = cpu->decode.opcode;
-                        strcpy(rob_entry->opcode_str, cpu->decode.opcode_str);
-                        rob_entry->des_phy_reg = first_free_phy_reg;
-                        iq_entry->rob_tail = cpu->rob_tail; // rob index assigned
-                        cpu->rob_tail = (cpu->rob_tail + 1) % 64;
-                        //rob end
-                        if (cpu->zero_flag == FALSE)
-                        {
-                            cpu->is_stalled = 1;
-                        }
-                        iq_entry->fu_type = 5;
-                        cpu->decode.has_insn = FALSE;
-
-                        break;
-                    }
-
-                    case OPCODE_HALT:
-
-                    {
-
-                        /* HALT/NOP doesn't have register operands */
-                        iq_entry->fu_type = 3;
-                        cpu->decode.has_insn = FALSE;
-                        break;
-                    }
-                    }
+                    return;
                 }
             }
             else
             {
-                switch (cpu->decode.opcode)
-                {
-                case OPCODE_LDR:
-                {
+                int first_free_phy_reg = -1;
 
-                    ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
-                    rob_entry->pc = cpu->decode.pc;
-                    rob_entry->src1 = rs1_physical;
-                    rob_entry->src2 = rs2_physical;
-                    rob_entry->des_rd = cpu->decode.rd;
-                    rob_entry->exception_codes = 0;
-                    rob_entry->result_valid = 0;
-                    rob_entry->result = 0;
-                    rob_entry->instruction_type = cpu->decode.opcode;
-                    strcpy(rob_entry->opcode_str, cpu->decode.opcode_str);
-                    rob_entry->des_phy_reg = first_free_phy_reg;
+                int rs1_physical = cpu->decode.rs1 > -1 ? cpu->rename_table[cpu->decode.rs1] : -1;
+                int rs2_physical = cpu->decode.rs2 > -1 ? cpu->rename_table[cpu->decode.rs2] : -1;
+                int rs3_physical = -1;
+                if (cpu->decode.opcode == OPCODE_STR)
+                    rs3_physical = cpu->decode.rs3 > -1 ? cpu->rename_table[cpu->decode.rs3] : -1;
 
-                    if (cpu->phys_regs_valid[rs1_physical] == 1 && cpu->phys_regs_valid[rs2_physical] == 1)
+                for (int i = 0; i < 48; i++)
+                {
+                    if (cpu->free_PR_list[i] == 0)
                     {
-                        rob_entry->mready = 1;
-
-                        cpu->rob_current_instruction = cpu->rob_tail;
-                        cpu->rob_tail = (cpu->rob_tail + 1) % 64;
-                        cpu->memory1.rob_entry = rob_entry;
-
-                        cpu->memory1.has_insn = TRUE;
+                        first_free_phy_reg = i;
+                        cpu->free_PR_list[i] = 1;
+                        cpu->phys_regs_valid[i] = 1;
+                        break;
                     }
+                }
 
-                    else
+                if (first_free_phy_reg > -1)
+                {
+                    cpu->rename_table[cpu->decode.rd] = first_free_phy_reg;
+                    //add a rename table entry made rename table contents as invalid
+                    cpu->rename_table_valid[cpu->decode.rd] = 0;
+                    cpu->phys_regs_valid[cpu->rename_table[cpu->decode.rd]] = 0;
+                }
+                if (!(first_free_phy_reg > -1))
+                {
+                    stagestalled = 1;
+                }
+                int i = 0;
+                for (i = 0; i < 24; i++)
+                {
+                    /*iq means iq entry occupied o means free 1 means occupied*/
+                    if (cpu->freeiq[i] < 1)
                     {
-                        //create entry in iq and wait for The ready bit
+                        break;
+                    }
+                }
+                if (i == 24)
+                {
+                    stagestalled = 1;
+                }
 
-                        rob_entry->mready = 0;
-
-                        cpu->rob_current_instruction = cpu->rob_tail;
-                        cpu->rob_tail = (cpu->rob_tail + 1) % 64;
-
+                if (cpu->decode.opcode != OPCODE_LOAD && cpu->decode.opcode != OPCODE_LDR && cpu->decode.opcode != OPCODE_STORE && cpu->decode.opcode != OPCODE_STR)
+                {
+                    if (stagestalled == 0)
+                    {
                         /*fill the iq entry*/
                         for (int i = 0; i < 24; i++)
                         {
@@ -587,72 +443,208 @@ APEX_decode(APEX_CPU *cpu)
                         strcpy(iq_entry->opcode_str, cpu->decode.opcode_str);
                         iq_entry->src1 = rs1_physical;
                         iq_entry->src2 = rs2_physical;
+                        iq_entry->imm = cpu->decode.imm;
                         iq_entry->pc = cpu->decode.pc;
                         iq_entry->des_phy_reg = first_free_phy_reg;
                         iq_entry->des_rd = cpu->decode.rd;
-                        iq_entry->rob_tail = cpu->rob_current_instruction;
-                        cpu->decode.has_insn = FALSE;
-                    }
-                    break;
-                }
-                case OPCODE_LOAD:
-                {
-                    ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
-                    rob_entry->pc = cpu->decode.pc;
-                    rob_entry->src1 = rs1_physical;
-                    rob_entry->imm = cpu->decode.imm;
-                    rob_entry->des_rd = cpu->decode.rd;
-                    rob_entry->exception_codes = 0;
-                    rob_entry->result_valid = 0;
-                    rob_entry->result = 0;
-                    rob_entry->instruction_type = cpu->decode.opcode;
-                    strcpy(rob_entry->opcode_str, cpu->decode.opcode_str);
-                    rob_entry->des_phy_reg = first_free_phy_reg;
-
-                    if (cpu->phys_regs_valid[rs1_physical] == 1)
-                    {
-                        rob_entry->mready = 1;
-                        cpu->rob_current_instruction = cpu->rob_tail;
-                        cpu->rob_tail = (cpu->rob_tail + 1) % 64;
-                        cpu->memory1.rob_entry = rob_entry;
-
-                        cpu->memory1.has_insn = TRUE;
-                    }
-                    else
-                    {
-                        //create entry in iq and wait for The ready bit
-
-                        //create entry in iq and wait for The ready bit
-
-                        rob_entry->mready = 0;
-
-                        cpu->rob_current_instruction = cpu->rob_tail;
-                        cpu->rob_tail = (cpu->rob_tail + 1) % 64;
-
-                        /*fill the iq entry*/
-                        for (int i = 0; i < 24; i++)
+                        switch (cpu->decode.opcode)
                         {
-                            if (cpu->freeiq[i] == 0)
-                            {
-                                iq_entry = &cpu->IssueQueue[i];
-                                cpu->freeiq[i] = 1;
-                                break;
-                            }
+
+                        case OPCODE_ADD:
+                        case OPCODE_SUB:
+                        case OPCODE_MOVC:
+                        case OPCODE_CMP:
+                        {
+                            //rob
+                            ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
+                            rob_entry->pc = cpu->decode.pc;
+                            rob_entry->src1 = rs1_physical;
+                            rob_entry->src2 = rs2_physical;
+                            rob_entry->des_rd = cpu->decode.rd;
+                            rob_entry->exception_codes = 0;
+                            rob_entry->result_valid = 0;
+                            rob_entry->result = 0;
+                            rob_entry->mready = 0;
+                            rob_entry->instruction_type = cpu->decode.opcode;
+                            strcpy(rob_entry->opcode_str, cpu->decode.opcode_str);
+                            rob_entry->des_phy_reg = first_free_phy_reg;
+                            iq_entry->rob_tail = cpu->rob_tail; // rob index assigned
+                            cpu->rob_tail = (cpu->rob_tail + 1) % 64;
+                            //rob end
+
+                            /*3 for ifu*/
+                            iq_entry->fu_type = 3;
+                            cpu->decode.has_insn = FALSE;
+                            break;
                         }
-                        iq_entry->opcode = cpu->decode.opcode;
-                        strcpy(iq_entry->opcode_str, cpu->decode.opcode_str);
-                        iq_entry->src1 = rs1_physical;
-                        iq_entry->src2 = rs2_physical;
-                        iq_entry->pc = cpu->decode.pc;
-                        iq_entry->des_phy_reg = first_free_phy_reg;
-                        iq_entry->des_rd = cpu->decode.rd;
-                        iq_entry->rob_tail = cpu->rob_current_instruction;
-                        cpu->decode.has_insn = FALSE;
+                        case OPCODE_MUL:
+                        {
+                            //rob
+                            ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
+                            rob_entry->pc = cpu->decode.pc;
+                            rob_entry->src1 = rs1_physical;
+                            rob_entry->src2 = rs2_physical;
+                            rob_entry->des_rd = cpu->decode.rd;
+                            rob_entry->exception_codes = 0;
+                            rob_entry->result_valid = 0;
+                            rob_entry->result = 0;
+                            rob_entry->mready = 0;
+                            rob_entry->instruction_type = cpu->decode.opcode;
+                            strcpy(rob_entry->opcode_str, cpu->decode.opcode_str);
+                            rob_entry->des_phy_reg = first_free_phy_reg;
+                            iq_entry->rob_tail = cpu->rob_tail; // rob index assigned
+                            cpu->rob_tail = (cpu->rob_tail + 1) % 64;
+                            //rob end
+                            iq_entry->fu_type = 4;
+                            cpu->decode.has_insn = FALSE;
+                            break;
+                        }
+                        case OPCODE_JUMP:
+                        case OPCODE_JAL:
+                        {
+                            //rob
+                            ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
+                            rob_entry->pc = cpu->decode.pc;
+                            rob_entry->src1 = rs1_physical;
+                            rob_entry->des_rd = cpu->decode.rd;
+                            rob_entry->exception_codes = 0;
+                            rob_entry->result_valid = 0;
+                            rob_entry->result = 0;
+                            rob_entry->mready = 0;
+                            rob_entry->instruction_type = cpu->decode.opcode;
+                            strcpy(rob_entry->opcode_str, cpu->decode.opcode_str);
+                            rob_entry->des_phy_reg = first_free_phy_reg;
+                            iq_entry->rob_tail = cpu->rob_tail; // rob index assigned
+                            cpu->rob_tail = (cpu->rob_tail + 1) % 64;
+                            //rob end
+
+                            cpu->is_stalled = 1;
+                            iq_entry->fu_type = 5;
+                            cpu->decode.has_insn = FALSE;
+                            break;
+                        }
+                        }
                     }
-                    break;
                 }
-                case OPCODE_STORE:
+                else
                 {
+                    switch (cpu->decode.opcode)
+                    {
+                    case OPCODE_LDR:
+                    {
+
+                        ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
+                        rob_entry->pc = cpu->decode.pc;
+                        rob_entry->src1 = rs1_physical;
+                        rob_entry->src2 = rs2_physical;
+                        rob_entry->des_rd = cpu->decode.rd;
+                        rob_entry->exception_codes = 0;
+                        rob_entry->result_valid = 0;
+                        rob_entry->result = 0;
+                        rob_entry->instruction_type = cpu->decode.opcode;
+                        strcpy(rob_entry->opcode_str, cpu->decode.opcode_str);
+                        rob_entry->des_phy_reg = first_free_phy_reg;
+
+                        if (cpu->phys_regs_valid[rs1_physical] == 1 && cpu->phys_regs_valid[rs2_physical] == 1)
+                        {
+                            rob_entry->mready = 1;
+
+                            cpu->rob_current_instruction = cpu->rob_tail;
+                            cpu->rob_tail = (cpu->rob_tail + 1) % 64;
+                            cpu->memory1.rob_entry = rob_entry;
+
+                            cpu->memory1.has_insn = TRUE;
+                        }
+
+                        else
+                        {
+                            //create entry in iq and wait for The ready bit
+
+                            rob_entry->mready = 0;
+
+                            cpu->rob_current_instruction = cpu->rob_tail;
+                            cpu->rob_tail = (cpu->rob_tail + 1) % 64;
+
+                            /*fill the iq entry*/
+                            for (int i = 0; i < 24; i++)
+                            {
+                                if (cpu->freeiq[i] == 0)
+                                {
+                                    iq_entry = &cpu->IssueQueue[i];
+                                    cpu->freeiq[i] = 1;
+                                    break;
+                                }
+                            }
+                            iq_entry->opcode = cpu->decode.opcode;
+                            strcpy(iq_entry->opcode_str, cpu->decode.opcode_str);
+                            iq_entry->src1 = rs1_physical;
+                            iq_entry->src2 = rs2_physical;
+                            iq_entry->pc = cpu->decode.pc;
+                            iq_entry->des_phy_reg = first_free_phy_reg;
+                            iq_entry->des_rd = cpu->decode.rd;
+                            iq_entry->rob_tail = cpu->rob_current_instruction;
+                            cpu->decode.has_insn = FALSE;
+                        }
+                        break;
+                    }
+                    case OPCODE_LOAD:
+                    {
+                        ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
+                        rob_entry->pc = cpu->decode.pc;
+                        rob_entry->src1 = rs1_physical;
+                        rob_entry->imm = cpu->decode.imm;
+                        rob_entry->des_rd = cpu->decode.rd;
+                        rob_entry->exception_codes = 0;
+                        rob_entry->result_valid = 0;
+                        rob_entry->result = 0;
+                        rob_entry->instruction_type = cpu->decode.opcode;
+                        strcpy(rob_entry->opcode_str, cpu->decode.opcode_str);
+                        rob_entry->des_phy_reg = first_free_phy_reg;
+
+                        if (cpu->phys_regs_valid[rs1_physical] == 1)
+                        {
+                            rob_entry->mready = 1;
+                            cpu->rob_current_instruction = cpu->rob_tail;
+                            cpu->rob_tail = (cpu->rob_tail + 1) % 64;
+                            cpu->memory1.rob_entry = rob_entry;
+
+                            cpu->memory1.has_insn = TRUE;
+                        }
+                        else
+                        {
+                            //create entry in iq and wait for The ready bit
+
+                            //create entry in iq and wait for The ready bit
+
+                            rob_entry->mready = 0;
+
+                            cpu->rob_current_instruction = cpu->rob_tail;
+                            cpu->rob_tail = (cpu->rob_tail + 1) % 64;
+
+                            /*fill the iq entry*/
+                            for (int i = 0; i < 24; i++)
+                            {
+                                if (cpu->freeiq[i] == 0)
+                                {
+                                    iq_entry = &cpu->IssueQueue[i];
+                                    cpu->freeiq[i] = 1;
+                                    break;
+                                }
+                            }
+                            iq_entry->opcode = cpu->decode.opcode;
+                            strcpy(iq_entry->opcode_str, cpu->decode.opcode_str);
+                            iq_entry->src1 = rs1_physical;
+                            iq_entry->src2 = rs2_physical;
+                            iq_entry->pc = cpu->decode.pc;
+                            iq_entry->des_phy_reg = first_free_phy_reg;
+                            iq_entry->des_rd = cpu->decode.rd;
+                            iq_entry->rob_tail = cpu->rob_current_instruction;
+                            cpu->decode.has_insn = FALSE;
+                        }
+                        break;
+                    }
+                    case OPCODE_STORE:
+                    {
 
                         ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
                         rob_entry->pc = cpu->decode.pc;
@@ -665,99 +657,100 @@ APEX_decode(APEX_CPU *cpu)
                         rob_entry->instruction_type = cpu->decode.opcode;
                         strcpy(rob_entry->opcode_str, cpu->decode.opcode_str);
                         rob_entry->des_phy_reg = first_free_phy_reg;
-                    if (cpu->phys_regs_valid[rs1_physical] == 1 && cpu->phys_regs_valid[rs2_physical] == 1)
+                        if (cpu->phys_regs_valid[rs1_physical] == 1 && cpu->phys_regs_valid[rs2_physical] == 1)
+                        {
+                            rob_entry->mready = 1;
+                            cpu->rob_current_instruction = cpu->rob_tail;
+                            cpu->rob_tail = (cpu->rob_tail + 1) % 64;
+                        }
+                        else
+                        {
+                            //create entry in iq and wait for The mready bit
+
+                            rob_entry->mready = 0;
+
+                            cpu->rob_current_instruction = cpu->rob_tail;
+                            cpu->rob_tail = (cpu->rob_tail + 1) % 64;
+
+                            /*fill the iq entry*/
+                            for (int i = 0; i < 24; i++)
+                            {
+                                if (cpu->freeiq[i] == 0)
+                                {
+                                    iq_entry = &cpu->IssueQueue[i];
+                                    cpu->freeiq[i] = 1;
+                                    break;
+                                }
+                            }
+                            iq_entry->opcode = cpu->decode.opcode;
+                            strcpy(iq_entry->opcode_str, cpu->decode.opcode_str);
+                            iq_entry->src1 = rs1_physical;
+                            iq_entry->src2 = rs2_physical;
+                            iq_entry->imm = cpu->decode.imm;
+                            iq_entry->pc = cpu->decode.pc;
+                            iq_entry->des_phy_reg = first_free_phy_reg;
+                            iq_entry->des_rd = cpu->decode.rd;
+                            iq_entry->rob_tail = cpu->rob_current_instruction;
+                            cpu->decode.has_insn = FALSE;
+                        }
+                        break;
+                    }
+                    case OPCODE_STR:
                     {
+
+                        ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
+                        rob_entry->pc = cpu->decode.pc;
+                        rob_entry->src1 = rs1_physical;
+                        rob_entry->src2 = rs2_physical;
+                        rob_entry->src3 = rs3_physical;
+                        rob_entry->exception_codes = 0;
+                        rob_entry->result_valid = 0;
+                        rob_entry->result = 0;
+                        rob_entry->instruction_type = cpu->decode.opcode;
+                        strcpy(rob_entry->opcode_str, cpu->decode.opcode_str);
+                        rob_entry->des_phy_reg = first_free_phy_reg;
                         rob_entry->mready = 1;
-                        cpu->rob_current_instruction = cpu->rob_tail;
-                        cpu->rob_tail = (cpu->rob_tail + 1) % 64;
-                    }
-                    else
-                    {
-                        //create entry in iq and wait for The mready bit
-
-                        rob_entry->mready = 0;
-
-                        cpu->rob_current_instruction = cpu->rob_tail;
-                        cpu->rob_tail = (cpu->rob_tail + 1) % 64;
-
-                        /*fill the iq entry*/
-                        for (int i = 0; i < 24; i++)
+                        if (cpu->phys_regs_valid[rs1_physical] == 1 && cpu->phys_regs_valid[rs2_physical] == 1 && cpu->phys_regs_valid[rs3_physical] == 1)
                         {
-                            if (cpu->freeiq[i] == 0)
-                            {
-                                iq_entry = &cpu->IssueQueue[i];
-                                cpu->freeiq[i] = 1;
-                                break;
-                            }
+                            cpu->rob_current_instruction = cpu->rob_tail;
+                            cpu->rob_tail = (cpu->rob_tail + 1) % 64;
+                            cpu->memory1.rob_entry = rob_entry;
+
+                            cpu->memory1.has_insn = TRUE;
                         }
-                        iq_entry->opcode = cpu->decode.opcode;
-                        strcpy(iq_entry->opcode_str, cpu->decode.opcode_str);
-                        iq_entry->src1 = rs1_physical;
-                        iq_entry->src2 = rs2_physical;
-                        iq_entry->imm=cpu->decode.imm;
-                        iq_entry->pc = cpu->decode.pc;
-                        iq_entry->des_phy_reg = first_free_phy_reg;
-                        iq_entry->des_rd = cpu->decode.rd;
-                        iq_entry->rob_tail = cpu->rob_current_instruction;
-                        cpu->decode.has_insn = FALSE;
-                    }
-                    break;
-                }
-                case OPCODE_STR:
-                {
-
-                    ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
-                    rob_entry->pc = cpu->decode.pc;
-                    rob_entry->src1 = rs1_physical;
-                    rob_entry->src2 = rs2_physical;
-                    rob_entry->src3 = rs3_physical;
-                    rob_entry->exception_codes = 0;
-                    rob_entry->result_valid = 0;
-                    rob_entry->result = 0;
-                    rob_entry->instruction_type = cpu->decode.opcode;
-                    strcpy(rob_entry->opcode_str, cpu->decode.opcode_str);
-                    rob_entry->des_phy_reg = first_free_phy_reg;
-                    rob_entry->mready = 1;
-                    if (cpu->phys_regs_valid[rs1_physical] == 1 && cpu->phys_regs_valid[rs2_physical] == 1 && cpu->phys_regs_valid[rs3_physical] == 1)
-                    {
-                        cpu->rob_current_instruction = cpu->rob_tail;
-                        cpu->rob_tail = (cpu->rob_tail + 1) % 64;
-                        cpu->memory1.rob_entry = rob_entry;
-
-                        cpu->memory1.has_insn = TRUE;
-                    }
-                    else
-                    {
-                        //create entry in iq and wait for The ready bit
-
-                        rob_entry->mready = 0;
-
-                        cpu->rob_current_instruction = cpu->rob_tail;
-                        cpu->rob_tail = (cpu->rob_tail + 1) % 64;
-
-                        /*fill the iq entry*/
-                        for (int i = 0; i < 24; i++)
+                        else
                         {
-                            if (cpu->freeiq[i] == 0)
+                            //create entry in iq and wait for The ready bit
+
+                            rob_entry->mready = 0;
+
+                            cpu->rob_current_instruction = cpu->rob_tail;
+                            cpu->rob_tail = (cpu->rob_tail + 1) % 64;
+
+                            /*fill the iq entry*/
+                            for (int i = 0; i < 24; i++)
                             {
-                                iq_entry = &cpu->IssueQueue[i];
-                                cpu->freeiq[i] = 1;
-                                break;
+                                if (cpu->freeiq[i] == 0)
+                                {
+                                    iq_entry = &cpu->IssueQueue[i];
+                                    cpu->freeiq[i] = 1;
+                                    break;
+                                }
                             }
+                            iq_entry->opcode = cpu->decode.opcode;
+                            strcpy(iq_entry->opcode_str, cpu->decode.opcode_str);
+                            iq_entry->src1 = rs1_physical;
+                            iq_entry->src2 = rs2_physical;
+                            iq_entry->src3 = rs3_physical;
+                            iq_entry->pc = cpu->decode.pc;
+                            iq_entry->des_phy_reg = first_free_phy_reg;
+                            iq_entry->des_rd = cpu->decode.rd;
+                            iq_entry->rob_tail = cpu->rob_current_instruction;
+                            cpu->decode.has_insn = FALSE;
                         }
-                        iq_entry->opcode = cpu->decode.opcode;
-                        strcpy(iq_entry->opcode_str, cpu->decode.opcode_str);
-                        iq_entry->src1 = rs1_physical;
-                        iq_entry->src2 = rs2_physical;
-                        iq_entry->src3 = rs3_physical;
-                        iq_entry->pc = cpu->decode.pc;
-                        iq_entry->des_phy_reg = first_free_phy_reg;
-                        iq_entry->des_rd = cpu->decode.rd;
-                        iq_entry->rob_tail = cpu->rob_current_instruction;
-                        cpu->decode.has_insn = FALSE;
+                        break;
                     }
-                    break;
-                }
+                    }
                 }
             }
         }
@@ -834,8 +827,6 @@ APEX_memory2(APEX_CPU *cpu)
             selectedrobentry->exception_codes = 0;
             selectedrobentry->result_valid = 1;
             selectedrobentry->result = cpu->memory2.result_buffer;
-            // rob_entry->des_phy_reg= rob_entry.des_phy_reg;
-            // rob_entry->des_rd=rob_entry.des_rd;
             //end
 
             break;
@@ -845,17 +836,14 @@ APEX_memory2(APEX_CPU *cpu)
 
         {
             // mem addr[memory_address] <- src1
-            //  cpu->data_memory[cpu->memory2.memory_address] = cpu->memory2.rs1_value;
             //  cpu->data_memory[cpu->memory2.memory_address] = cpu->phys_regs[selectedrobentry->src1];
             cpu->memory2.result_buffer = cpu->phys_regs[selectedrobentry->src1];
-
-            //start
+              //start
             // ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
             selectedrobentry->exception_codes = 0;
             selectedrobentry->result_valid = 1;
             selectedrobentry->result = cpu->memory2.result_buffer;
             selectedrobentry->des_phy_reg = cpu->memory2.memory_address;
-            // rob_entry->des_rd=rob_entry.des_rd;
             //end
             break;
         }
@@ -973,6 +961,20 @@ APEX_issuequeue(APEX_CPU *cpu)
             {
                 selectedrobqentry = iqe;
                 robissued = issuequequeindex;
+                cpu->memory1.rob_entry = &cpu->ROB[iqe.rob_tail];
+                cpu->ROB[iqe.rob_tail].mready = 1;
+            }
+            break;
+        }
+        case OPCODE_LOAD:
+        {
+            if (cpu->phys_regs_valid[iqe.src1] == 1)
+
+            {
+                selectedrobqentry = iqe;
+                robissued = issuequequeindex;
+                cpu->memory1.rob_entry = &cpu->ROB[iqe.rob_tail];
+                cpu->ROB[iqe.rob_tail].mready = 1;
             }
             break;
         }
@@ -983,6 +985,20 @@ APEX_issuequeue(APEX_CPU *cpu)
             {
                 selectedrobqentry = iqe;
                 robissued = issuequequeindex;
+                cpu->memory1.rob_entry = &cpu->ROB[selectedrobqentry.rob_tail];
+                cpu->ROB[iqe.rob_tail].mready = 1;
+            }
+            break;
+        }
+        case OPCODE_STORE:
+        {
+            if (cpu->phys_regs_valid[iqe.src1] == 1 && cpu->phys_regs_valid[iqe.src2] == 1)
+
+            {
+                selectedrobqentry = iqe;
+                robissued = issuequequeindex;
+                cpu->memory1.rob_entry = &cpu->ROB[selectedrobqentry.rob_tail];
+                cpu->ROB[iqe.rob_tail].mready = 1;
             }
             break;
         }
@@ -1037,10 +1053,11 @@ APEX_issuequeue(APEX_CPU *cpu)
     }
     if (robissued > -1)
     {
-        IQ_ENTRY entry = selectedrobqentry;
-        ROB_ENTRY *rob_entry = &cpu->ROB[entry.rob_tail];
-        rob_entry->mready = 1;
-        entry.finishedstage = IQ;
+       // IQ_ENTRY entry = selectedrobqentry;
+        //     ROB_ENTRY *rob_entry = &cpu->ROB[entry.rob_tail];
+        //     rob_entry->mready = 1;
+        cpu->memory1.has_insn = TRUE;
+        selectedrobqentry.finishedstage = IQ;
         cpu->freeiq[robissued] = 0;
     }
 }
@@ -1050,7 +1067,7 @@ APEX_intfu(APEX_CPU *cpu)
 {
     IQ_ENTRY iq_entry = cpu->intfu.iq_entry;
 
-    if (!cpu->intfu.stalled && iq_entry.finishedstage < INTFU && cpu->intfu.has_insn)
+    if (!cpu->intfu.stalled && cpu->intfu.has_insn)
     {
         switch (iq_entry.opcode)
         {
@@ -1289,20 +1306,20 @@ int APEX_mul2(APEX_CPU *cpu)
 
 int APEX_mul3(APEX_CPU *cpu)
 {
-    
-        IQ_ENTRY iq_entry = cpu->mul3.iq_entry;
+
+    IQ_ENTRY iq_entry = cpu->mul3.iq_entry;
 
     if (!cpu->mul3.stalled && iq_entry.finishedstage < MUL3 && cpu->mul3.has_insn)
-    { 
-        
-    //start
-    ROB_ENTRY *rob_entry = &cpu->ROB[iq_entry.rob_tail];
-    rob_entry->exception_codes = 0;
-    rob_entry->result_valid = 1;
-    rob_entry->result = cpu->mul3.result_buffer;
-    rob_entry->des_phy_reg = iq_entry.des_phy_reg;
-    rob_entry->des_rd = iq_entry.des_rd;
-    //end
+    {
+
+        //start
+        ROB_ENTRY *rob_entry = &cpu->ROB[iq_entry.rob_tail];
+        rob_entry->exception_codes = 0;
+        rob_entry->result_valid = 1;
+        rob_entry->result = cpu->mul3.result_buffer;
+        rob_entry->des_phy_reg = iq_entry.des_phy_reg;
+        rob_entry->des_rd = iq_entry.des_rd;
+        //end
         iq_entry.finishedstage = MUL3;
         cpu->mul3.has_insn = FALSE;
         if (ENABLE_DEBUG_MESSAGES)
@@ -1468,10 +1485,8 @@ int APEX_instruction_commitment(APEX_CPU *cpu)
                                                 selectedrobentry->instruction_type == OPCODE_SUB || selectedrobentry->instruction_type == OPCODE_MOVC || selectedrobentry->instruction_type == OPCODE_CMP || selectedrobentry->instruction_type == OPCODE_MUL))
     {
 
-
         instruction_retirement_intfu(cpu, selectedrobentry->result, selectedrobentry->des_rd, selectedrobentry->des_phy_reg);
         cpu->rob_head = (cpu->rob_head + 1) % 64;
-
     }
     else if (selectedrobentry->result_valid && (selectedrobentry->instruction_type == OPCODE_BZ))
     {
@@ -1507,9 +1522,8 @@ int APEX_instruction_commitment(APEX_CPU *cpu)
     }
     if (ENABLE_DEBUG_MESSAGES)
     {
-        printf("Instruction at ROB____________Stage---> %d",selectedrobentry->pc);
-                printf("\n");
-
+        printf("Instruction at ROB____________Stage---> %d", selectedrobentry->pc);
+        printf("\n");
     }
     if (selectedrobentry->instruction_type == OPCODE_HALT)
     {
