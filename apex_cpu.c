@@ -197,11 +197,14 @@ static void print_rob(APEX_CPU *cpu)
     printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
     printf("Details of R-ROB  State --\n");
 
-    for (int i = cpu->rob_head; i < cpu->rob_tail; i++)
-    {
-        ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_head];
-
-        printf("%s,R%d", rob_entry->opcode_str, rob_entry->des_rd);
+    int a=cpu->rob_head;
+    while(a <cpu->rob_tail)
+     {
+    ROB_ENTRY *rob_entry = &cpu->ROB[a];
+  
+    printf("%s,R%d __pc[%d] \n  ", rob_entry->opcode_str, rob_entry->des_rd,rob_entry->pc);
+    
+    a++;
     }
     printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
 }
@@ -989,6 +992,7 @@ APEX_issuequeue(APEX_CPU *cpu)
     if (ENABLE_DEBUG_MESSAGES)
     {
         printf("Instruction at issuequeue____________Stage--->");
+        printf("\n");
 
         IQ_ENTRY *iq_entry1;
         for (int i = 0; i < 24; i++)
@@ -1285,7 +1289,12 @@ int APEX_mul2(APEX_CPU *cpu)
 
 int APEX_mul3(APEX_CPU *cpu)
 {
-    IQ_ENTRY iq_entry = cpu->mul3.iq_entry;
+    
+        IQ_ENTRY iq_entry = cpu->mul3.iq_entry;
+
+    if (!cpu->mul3.stalled && iq_entry.finishedstage < MUL3 && cpu->mul3.has_insn)
+    { 
+        
     //start
     ROB_ENTRY *rob_entry = &cpu->ROB[iq_entry.rob_tail];
     rob_entry->exception_codes = 0;
@@ -1294,9 +1303,6 @@ int APEX_mul3(APEX_CPU *cpu)
     rob_entry->des_phy_reg = iq_entry.des_phy_reg;
     rob_entry->des_rd = iq_entry.des_rd;
     //end
-
-    if (!cpu->mul3.stalled && iq_entry.finishedstage < MUL3 && cpu->mul3.has_insn)
-    { 
         iq_entry.finishedstage = MUL3;
         cpu->mul3.has_insn = FALSE;
         if (ENABLE_DEBUG_MESSAGES)
@@ -1462,9 +1468,10 @@ int APEX_instruction_commitment(APEX_CPU *cpu)
                                                 selectedrobentry->instruction_type == OPCODE_SUB || selectedrobentry->instruction_type == OPCODE_MOVC || selectedrobentry->instruction_type == OPCODE_CMP || selectedrobentry->instruction_type == OPCODE_MUL))
     {
 
-        cpu->rob_head = (cpu->rob_head + 1) % 64;
 
         instruction_retirement_intfu(cpu, selectedrobentry->result, selectedrobentry->des_rd, selectedrobentry->des_phy_reg);
+        cpu->rob_head = (cpu->rob_head + 1) % 64;
+
     }
     else if (selectedrobentry->result_valid && (selectedrobentry->instruction_type == OPCODE_BZ))
     {
@@ -1500,7 +1507,9 @@ int APEX_instruction_commitment(APEX_CPU *cpu)
     }
     if (ENABLE_DEBUG_MESSAGES)
     {
-        printf("Instruction at ROB____________Stage--->");
+        printf("Instruction at ROB____________Stage---> %d",selectedrobentry->pc);
+                printf("\n");
+
     }
     if (selectedrobentry->instruction_type == OPCODE_HALT)
     {
