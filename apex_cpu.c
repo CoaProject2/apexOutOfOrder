@@ -1474,7 +1474,8 @@ int APEX_instruction_commitment(APEX_CPU *cpu)
 
     ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_head];
     ROB_ENTRY *selectedrobentry = rob_entry;
-
+    while (selectedrobentry->result_valid)
+     {
     if (selectedrobentry->result_valid && (selectedrobentry->instruction_type == OPCODE_STR || selectedrobentry->instruction_type == OPCODE_STORE))
     {
         //  cpu->data_memory[cpu->memory2.memory_address]=rob_entry->result;
@@ -1528,6 +1529,8 @@ int APEX_instruction_commitment(APEX_CPU *cpu)
     if (selectedrobentry->instruction_type == OPCODE_HALT)
     {
         return TRUE;
+    }
+    selectedrobentry=&cpu->ROB[cpu->rob_head];
     }
     //default
     return 0;
