@@ -710,28 +710,6 @@ APEX_decode(APEX_CPU *cpu)
         }
     }
 }
-/*
- * ROB Stage of APEX Pipeline
- *
- * Note: You are free to edit this function according to your implementation
- */
-// static void
-// APEX_ROB(APEX_CPU *cpu)
-// {
-//     ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_head];
-//     ROB_ENTRY *selectedrobentry = rob_entry;
-//     if (selectedrobentry->mready == 1 && cpu->rob_head < cpu->rob_tail && cpu->rob_current_instruction < cpu->rob_tail)
-//     {
-//         cpu->memory1.rob_entry = selectedrobentry;
-
-//         cpu->memory1.has_insn = TRUE;
-//         cpu->rob_current_instruction = (cpu->rob_current_instruction + 1) % 64;
-//     }
-//     if (ENABLE_DEBUG_MESSAGES)
-//     {
-//         printf("Instruction at ROB____________Stage--->");
-//     }
-// }
 
 static void
 APEX_memory1(APEX_CPU *cpu)
@@ -807,41 +785,6 @@ APEX_memory2(APEX_CPU *cpu)
             // rob_entry->des_rd=rob_entry.des_rd;
             //end
 
-            // if (cpu->r_rename_table[selectedrobentry->des_rd] == 0 || cpu->r_rename_table[selectedrobentry->des_rd] == -1)
-            // {
-
-            //     //instruction retriement process
-            //     //iq_entry.des_phy_reg ==freed entry
-
-            //     cpu->phys_regs[selectedrobentry->des_phy_reg] = cpu->memory2.result_buffer;
-            //     //the phy is valid now
-            //     cpu->phys_regs_valid[selectedrobentry->des_phy_reg] = 1;
-
-            //     //rat update content is valid
-            //     cpu->rename_table_valid[selectedrobentry->des_rd] = 1;
-
-            //     //the r-rat entry is of rd is pointing to most recent phy_reg
-            //     cpu->r_rename_table[selectedrobentry->des_rd] = selectedrobentry->des_phy_reg;
-            //     cpu->r_rename_table_valid[selectedrobentry->des_rd] = 1;
-            // }
-            // else
-            // {
-            //     int previous_rat_index = cpu->r_rename_table[selectedrobentry->des_rd];
-            //     //the phy is invalid now
-            //     cpu->phys_regs_valid[previous_rat_index] = 0;
-            //     //free physical register
-            //     //mark contents has  free
-            //     cpu->free_PR_list[previous_rat_index] = 0;
-
-            //     cpu->phys_regs[selectedrobentry->des_phy_reg] = cpu->memory2.result_buffer;
-            //     //the phy is valid now
-            //     cpu->phys_regs_valid[selectedrobentry->des_phy_reg] = 1;
-            //     //rat update content is valid
-            //     cpu->rename_table_valid[selectedrobentry->des_rd] = 1;
-            //     //the r-rat entry is of rd is pointing to most recent phy_reg
-            //     cpu->r_rename_table[selectedrobentry->des_rd] = selectedrobentry->des_phy_reg;
-            //     cpu->r_rename_table_valid[selectedrobentry->des_rd] = 1;
-            // }
             break;
         }
         case OPCODE_STR:
@@ -1303,42 +1246,7 @@ int APEX_mul3(APEX_CPU *cpu)
     //end
 
     if (!cpu->mul3.stalled && iq_entry.finishedstage < MUL3 && cpu->mul3.has_insn)
-    { /*
-        if (cpu->r_rename_table[iq_entry.des_rd] == 0 || cpu->r_rename_table[iq_entry.des_rd] == -1)
-        {
-
-            //instruction retriement process
-            //iq_entry.des_phy_reg ==freed entry
-
-            cpu->phys_regs[iq_entry.des_phy_reg] = cpu->mul3.result_buffer;
-            //the phy is valid now
-            cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
-
-            //rat update content is valid
-            cpu->rename_table_valid[iq_entry.des_rd] = 1;
-
-            //the r-rat entry is of rd is pointing to most recent phy_reg
-            cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
-            cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
-        }
-        else
-        {
-            int previous_rat_index = cpu->r_rename_table[iq_entry.des_rd];
-            //the phy is invalid now
-            cpu->phys_regs_valid[previous_rat_index] = 0;
-            //free physical register
-            //mark contents has  free
-            cpu->free_PR_list[previous_rat_index] = 0;
-
-            cpu->phys_regs[iq_entry.des_phy_reg] = cpu->mul3.result_buffer;
-            //the phy is valid now
-            cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
-            //rat update content is valid
-            cpu->rename_table_valid[iq_entry.des_rd] = 1;
-            //the r-rat entry is of rd is pointing to most recent phy_reg
-            cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
-            cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
-        }*/
+    { 
         iq_entry.finishedstage = MUL3;
         cpu->mul3.has_insn = FALSE;
         if (ENABLE_DEBUG_MESSAGES)
@@ -1457,45 +1365,6 @@ int APEX_jbu2(APEX_CPU *cpu)
             rob_entry->imm = cpu->jbu2.rd; // one addition to pass commit function
             //end
 
-            //cpu->is_stalled = 0; // 1 means stalled
-            //cpu->pc = cpu->jbu2.result_buffer;
-            /*
-            if (cpu->r_rename_table[iq_entry.des_rd] == 0 || cpu->r_rename_table[iq_entry.des_rd] == -1)
-            {
-
-                //instruction retriement process
-                //iq_entry.des_phy_reg ==freed entry
-
-                cpu->phys_regs[iq_entry.des_phy_reg] = cpu->jbu2.rd; //change rd
-                //the phy is valid now
-                cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
-
-                //rat update content is valid
-                cpu->rename_table_valid[iq_entry.des_rd] = 1;
-
-                //the r-rat entry is of rd is pointing to most recent phy_reg
-                cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
-                cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
-            }
-            else
-            {
-                int previous_rat_index = cpu->r_rename_table[iq_entry.des_rd];
-                //the phy is invalid now
-                cpu->phys_regs_valid[previous_rat_index] = 0;
-                //free physical register
-                //mark contents has  free
-                cpu->free_PR_list[previous_rat_index] = 0;
-
-                cpu->phys_regs[iq_entry.des_phy_reg] = cpu->jbu2.rd;
-                //the phy is valid now
-                cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
-                //rat update content is valid
-                cpu->rename_table_valid[iq_entry.des_rd] = 1;
-                //the r-rat entry is of rd is pointing to most recent phy_reg
-                cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
-                cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
-            }
-*/
             break;
         }
         case OPCODE_JUMP:

@@ -40,7 +40,8 @@ A template for 5 Stage APEX In-order Pipeline
 
 ## Author
 
- - Copyright (C) Gaurav Kothari (gkothar1@binghamton.edu)
+ -  Darshan Doddaghatta  (ddoddag1@binghamton.edu)
+ -  Milind Parlawar  (mparlaw1@binghamton.edu)
  - State University of New York, Binghamton
 
 ## Bugs
