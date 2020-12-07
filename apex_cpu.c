@@ -355,7 +355,6 @@ APEX_decode(APEX_CPU *cpu)
                     ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
                     rob_entry->pc = cpu->decode.pc;
                     rob_entry->imm = cpu->decode.imm;
-
                     rob_entry->exception_codes = 0;
                     rob_entry->result_valid = 0;
                     rob_entry->result = 0;
@@ -726,7 +725,6 @@ APEX_decode(APEX_CPU *cpu)
                             cpu->rob_current_instruction = cpu->rob_tail;
                             cpu->rob_tail = (cpu->rob_tail + 1) % 64;
                             cpu->memory1.rob_entry = rob_entry;
-
                             cpu->memory1.has_insn = TRUE;
                         }
                         else
@@ -1692,7 +1690,6 @@ void APEX_cpu_run(APEX_CPU *cpu)
         }
         //APEX_ROB(cpu);
         APEX_issuequeue(cpu);
-        print_rob(cpu);
         APEX_decode(cpu);
         APEX_fetch(cpu);
 
@@ -1712,7 +1709,7 @@ void APEX_cpu_run(APEX_CPU *cpu)
 
             if ((user_prompt_val == 'Q') || (user_prompt_val == 'q'))
             {
-                printf("APEX_CPU: Simulation Stopped, cycles = %d instructions = %d\n", cpu->clock, cpu->insn_completed);
+                printf("APEX_CPU: Simulation Stopped, cycles = %d instructions = %d\n", cpu->clock+1, cpu->insn_completed);
                 break;
             }
         }
