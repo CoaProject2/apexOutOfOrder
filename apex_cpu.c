@@ -295,7 +295,7 @@ APEX_decode(APEX_CPU *cpu)
     {
         int stagestalled = 0;
         /*create a iq entruy*/
-        if (stagestalled == 0 && !cpu->is_stalled)
+        if (stagestalled == 0)
         {
             IQ_ENTRY *iq_entry = NULL;
 
@@ -317,6 +317,10 @@ APEX_decode(APEX_CPU *cpu)
                 rob_entry->des_phy_reg = -1;
                 cpu->rob_tail = (cpu->rob_tail + 1) % 64;
                 //rob end
+                if (ENABLE_DEBUG_MESSAGES)
+                {
+                    print_stage_content("Instruction at decode____________Stage--->", &cpu->decode);
+                }
                 return;
             }
             else if (cpu->decode.opcode == OPCODE_BZ || cpu->decode.opcode == OPCODE_BNZ)
@@ -368,21 +372,20 @@ APEX_decode(APEX_CPU *cpu)
                     {
                         if (cpu->zero_flag == TRUE)
                         {
-                            cpu->is_stalled = 1;
+                            //  cpu->is_stalled = 1;
                         }
                     }
                     if (cpu->decode.opcode == OPCODE_BNZ)
                     {
                         if (cpu->zero_flag == FALSE)
                         {
-                            cpu->is_stalled = 1;
+                            //cpu->is_stalled = 1;
                         }
                     }
 
                     iq_entry->fu_type = 5;
                     cpu->decode.has_insn = FALSE;
 
-                    return;
                 }
             }
             else
@@ -524,7 +527,7 @@ APEX_decode(APEX_CPU *cpu)
                             cpu->rob_tail = (cpu->rob_tail + 1) % 64;
                             //rob end
 
-                            cpu->is_stalled = 1;
+                            // cpu->is_stalled = 1;
                             iq_entry->fu_type = 5;
                             cpu->decode.has_insn = FALSE;
                             break;
@@ -598,7 +601,7 @@ APEX_decode(APEX_CPU *cpu)
                         ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
                         rob_entry->pc = cpu->decode.pc;
                         rob_entry->src1 = rs1_physical;
-                       
+
                         rob_entry->imm = cpu->decode.imm;
                         rob_entry->des_rd = cpu->decode.rd;
                         rob_entry->exception_codes = 0;
@@ -962,6 +965,7 @@ APEX_issuequeue(APEX_CPU *cpu)
             {
                 selectedbranchfuiqentry = iqe;
                 branchfuissued = issuequequeindex;
+                // cpu->is_stalled = 1;
             }
             break;
         }
@@ -1072,6 +1076,7 @@ APEX_issuequeue(APEX_CPU *cpu)
         entry.finishedstage = IQ;
         cpu->jbu1.iq_entry = entry;
         cpu->jbu1.stalled = 0;
+
         cpu->jbu1.has_insn = TRUE;
         cpu->freeiq[branchfuissued] = 0;
     }
@@ -1377,11 +1382,23 @@ int APEX_jbu1(APEX_CPU *cpu)
             // cpu->jbu1.result_buffer = iq_entry.src1 + iq_entry.imm;
             cpu->jbu1.result_buffer = cpu->phys_regs[iq_entry.src1] + iq_entry.imm;
             cpu->jbu1.rd = iq_entry.pc + 4;
+            cpu->decode.has_insn = TRUE;
+            cpu->fetch.has_insn = FALSE;
+            for (int i = 0; i < 24; i++)
+            {
+                cpu->freeiq[i] = 0;
+            }
             break;
         }
         case OPCODE_JUMP:
         {
             cpu->jbu1.result_buffer = cpu->phys_regs[iq_entry.src1] + iq_entry.imm;
+            cpu->decode.has_insn = TRUE;
+            cpu->fetch.has_insn = FALSE;
+            for (int i = 0; i < 24; i++)
+            {
+                cpu->freeiq[i] = 0;
+            }
             break;
         }
         case OPCODE_BZ:
@@ -1389,6 +1406,12 @@ int APEX_jbu1(APEX_CPU *cpu)
             if (cpu->zero_flag == TRUE)
             {
                 cpu->jbu1.result_buffer = iq_entry.pc + iq_entry.imm;
+                cpu->decode.has_insn = TRUE;
+                cpu->fetch.has_insn = FALSE;
+                for (int i = 0; i < 24; i++)
+                {
+                    cpu->freeiq[i] = 0;
+                }
             }
 
             break;
@@ -1398,6 +1421,12 @@ int APEX_jbu1(APEX_CPU *cpu)
             if (cpu->zero_flag == FALSE)
             {
                 cpu->jbu1.result_buffer = iq_entry.pc + iq_entry.imm;
+                cpu->decode.has_insn = TRUE;
+                cpu->fetch.has_insn = FALSE;
+                for (int i = 0; i < 24; i++)
+                {
+                    cpu->freeiq[i] = 0;
+                }
             }
             break;
         }
@@ -1442,6 +1471,14 @@ int APEX_jbu2(APEX_CPU *cpu)
             { // DO IN ROB
                 //cpu->pc = cpu->jbu2.result_buffer;
                 //cpu->is_stalled = 0; // 1 means stalled
+                cpu->decode.has_insn = FALSE;
+                cpu->pc = cpu->jbu2.result_buffer;
+
+                cpu->fetch.has_insn = TRUE;
+                for (int i = 0; i < 24; i++)
+                {
+                    cpu->freeiq[i] = 0;
+                }
             }
             break;
         }
@@ -1459,6 +1496,14 @@ int APEX_jbu2(APEX_CPU *cpu)
             { // DO IN ROB
                 //cpu->pc = cpu->jbu2.result_buffer;
                 //cpu->is_stalled = 0; // 1 means stalled
+                cpu->decode.has_insn = FALSE;
+                cpu->pc = cpu->jbu2.result_buffer;
+
+                cpu->fetch.has_insn = TRUE;
+                for (int i = 0; i < 24; i++)
+                {
+                    cpu->freeiq[i] = 0;
+                }
             }
             break;
         }
@@ -1473,6 +1518,15 @@ int APEX_jbu2(APEX_CPU *cpu)
             rob_entry->des_rd = iq_entry.des_rd;
 
             rob_entry->imm = cpu->jbu2.rd; // one addition to pass commit function
+            
+                cpu->decode.has_insn = FALSE;
+                cpu->pc = cpu->jbu2.result_buffer;
+
+                cpu->fetch.has_insn = TRUE;
+                for (int i = 0; i < 24; i++)
+                {
+                    cpu->freeiq[i] = 0;
+                }
             //end
 
             break;
@@ -1487,9 +1541,19 @@ int APEX_jbu2(APEX_CPU *cpu)
             rob_entry->result = cpu->jbu2.result_buffer;
             rob_entry->des_phy_reg = iq_entry.des_phy_reg;
             rob_entry->des_rd = iq_entry.des_rd;
+
             //end
             //cpu->is_stalled = 0;
             //cpu->pc = cpu->jbu2.result_buffer;
+            cpu->pc = cpu->jbu2.result_buffer;
+
+            cpu->decode.has_insn = FALSE;
+            cpu->fetch.has_insn = TRUE;
+            for (int i = 0; i < 24; i++)
+            {
+                cpu->freeiq[i] = 0;
+            }
+
             break;
         }
         }
@@ -1516,7 +1580,7 @@ int APEX_instruction_commitment(APEX_CPU *cpu)
 
     ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_head];
     ROB_ENTRY *selectedrobentry = rob_entry;
-    while (selectedrobentry->result_valid)
+    while (selectedrobentry->result_valid && cpu->rob_tail > cpu->rob_head)
     {
         if (selectedrobentry->result_valid && (selectedrobentry->instruction_type == OPCODE_STR || selectedrobentry->instruction_type == OPCODE_STORE))
         {
@@ -1535,33 +1599,34 @@ int APEX_instruction_commitment(APEX_CPU *cpu)
         {
             if (cpu->zero_flag == TRUE)
             {
-                cpu->pc = selectedrobentry->result;
-                cpu->is_stalled = 0; // 1 means stalled
+                cpu->rob_head = 0;
+                cpu->rob_tail = 0;
             }
-            cpu->rob_head = (cpu->rob_head + 1) % 64;
+            else{
+                cpu->rob_head = (cpu->rob_head + 1) % 64;
+        }
         }
         else if (selectedrobentry->result_valid && (selectedrobentry->instruction_type == OPCODE_BNZ))
         {
             if (cpu->zero_flag == FALSE)
             {
-                cpu->pc = selectedrobentry->result;
-                cpu->is_stalled = 0; // 1 means stalled
+                cpu->rob_head = 0;
+                cpu->rob_tail = 0;
             }
+            else{
             cpu->rob_head = (cpu->rob_head + 1) % 64;
-        }
+        }}
         else if (selectedrobentry->result_valid && selectedrobentry->instruction_type == OPCODE_JAL)
         {
-            cpu->is_stalled = 0; // 1 means stalled
-            cpu->pc = selectedrobentry->result;
-            //selectedrobentry->imm  //  to handle  JAL only
-            cpu->rob_head = (cpu->rob_head + 1) % 64;
             instruction_retirement_intfu(cpu, selectedrobentry->imm, selectedrobentry->des_rd, selectedrobentry->des_phy_reg);
+            cpu->rob_head = 0;
+            cpu->rob_tail = 0;
         }
         else if (selectedrobentry->result_valid && selectedrobentry->instruction_type == OPCODE_JUMP)
         {
-            cpu->is_stalled = 0;
-            cpu->pc = selectedrobentry->result;
-            cpu->rob_head = (cpu->rob_head + 1) % 64;
+            cpu->rob_head = 0;
+            cpu->rob_tail = 0;
+            break;
         }
 
         if (ENABLE_DEBUG_MESSAGES)
@@ -1670,9 +1735,10 @@ void APEX_cpu_run(APEX_CPU *cpu)
         if (ENABLE_DEBUG_MESSAGES)
         {
             printf("--------------------------------------------\n");
-            printf("Clock Cycle #: %d\n", cpu->clock);
+            printf("Clock Cycle #: %d\n", cpu->clock + 1);
             printf("--------------------------------------------\n");
         }
+        
         if (APEX_instruction_commitment(cpu))
         {
             breaktrue = 1;
@@ -1692,7 +1758,7 @@ void APEX_cpu_run(APEX_CPU *cpu)
         APEX_issuequeue(cpu);
         APEX_decode(cpu);
         APEX_fetch(cpu);
-
+        
         //  print_reg_file(cpu);
         print_rob(cpu);
         print_rename_table(cpu);
@@ -1709,7 +1775,7 @@ void APEX_cpu_run(APEX_CPU *cpu)
 
             if ((user_prompt_val == 'Q') || (user_prompt_val == 'q'))
             {
-                printf("APEX_CPU: Simulation Stopped, cycles = %d instructions = %d\n", cpu->clock+1, cpu->insn_completed);
+                printf("APEX_CPU: Simulation Stopped, cycles = %d instructions = %d\n", cpu->clock + 1, cpu->insn_completed);
                 break;
             }
         }
