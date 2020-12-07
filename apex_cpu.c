@@ -594,19 +594,20 @@ APEX_decode(APEX_CPU *cpu)
                 }
                 case OPCODE_LOAD:
                 {
+                    ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
+                    rob_entry->pc = cpu->decode.pc;
+                    rob_entry->src1 = rs1_physical;
+                    rob_entry->imm = cpu->decode.imm;
+                    rob_entry->des_rd = cpu->decode.rd;
+                    rob_entry->exception_codes = 0;
+                    rob_entry->result_valid = 0;
+                    rob_entry->result = 0;
+                    rob_entry->instruction_type = cpu->decode.opcode;
+                    strcpy(rob_entry->opcode_str, cpu->decode.opcode_str);
+                    rob_entry->des_phy_reg = first_free_phy_reg;
+
                     if (cpu->phys_regs_valid[rs1_physical] == 1)
                     {
-                        ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
-                        rob_entry->pc = cpu->decode.pc;
-                        rob_entry->src1 = rs1_physical;
-                        rob_entry->imm = cpu->decode.imm;
-                        rob_entry->des_rd = cpu->decode.rd;
-                        rob_entry->exception_codes = 0;
-                        rob_entry->result_valid = 0;
-                        rob_entry->result = 0;
-                        rob_entry->instruction_type = cpu->decode.opcode;
-                        strcpy(rob_entry->opcode_str, cpu->decode.opcode_str);
-                        rob_entry->des_phy_reg = first_free_phy_reg;
                         rob_entry->mready = 1;
                         cpu->rob_current_instruction = cpu->rob_tail;
                         cpu->rob_tail = (cpu->rob_tail + 1) % 64;
@@ -617,24 +618,52 @@ APEX_decode(APEX_CPU *cpu)
                     else
                     {
                         //create entry in iq and wait for The ready bit
+
+                        //create entry in iq and wait for The ready bit
+
+                        rob_entry->mready = 0;
+
+                        cpu->rob_current_instruction = cpu->rob_tail;
+                        cpu->rob_tail = (cpu->rob_tail + 1) % 64;
+
+                        /*fill the iq entry*/
+                        for (int i = 0; i < 24; i++)
+                        {
+                            if (cpu->freeiq[i] == 0)
+                            {
+                                iq_entry = &cpu->IssueQueue[i];
+                                cpu->freeiq[i] = 1;
+                                break;
+                            }
+                        }
+                        iq_entry->opcode = cpu->decode.opcode;
+                        strcpy(iq_entry->opcode_str, cpu->decode.opcode_str);
+                        iq_entry->src1 = rs1_physical;
+                        iq_entry->src2 = rs2_physical;
+                        iq_entry->pc = cpu->decode.pc;
+                        iq_entry->des_phy_reg = first_free_phy_reg;
+                        iq_entry->des_rd = cpu->decode.rd;
+                        iq_entry->rob_tail = cpu->rob_current_instruction;
+                        cpu->decode.has_insn = FALSE;
                     }
                     break;
                 }
                 case OPCODE_STORE:
                 {
 
-                    if (cpu->phys_regs_valid[rs1_physical] == 1 && cpu->phys_regs_valid[rs2_physical] == 1)
-                    {
                         ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
                         rob_entry->pc = cpu->decode.pc;
                         rob_entry->src1 = rs1_physical;
                         rob_entry->src2 = rs2_physical;
+                        rob_entry->imm = cpu->decode.imm;
                         rob_entry->exception_codes = 0;
                         rob_entry->result_valid = 0;
                         rob_entry->result = 0;
                         rob_entry->instruction_type = cpu->decode.opcode;
                         strcpy(rob_entry->opcode_str, cpu->decode.opcode_str);
                         rob_entry->des_phy_reg = first_free_phy_reg;
+                    if (cpu->phys_regs_valid[rs1_physical] == 1 && cpu->phys_regs_valid[rs2_physical] == 1)
+                    {
                         rob_entry->mready = 1;
                         cpu->rob_current_instruction = cpu->rob_tail;
                         cpu->rob_tail = (cpu->rob_tail + 1) % 64;
@@ -642,6 +671,32 @@ APEX_decode(APEX_CPU *cpu)
                     else
                     {
                         //create entry in iq and wait for The mready bit
+
+                        rob_entry->mready = 0;
+
+                        cpu->rob_current_instruction = cpu->rob_tail;
+                        cpu->rob_tail = (cpu->rob_tail + 1) % 64;
+
+                        /*fill the iq entry*/
+                        for (int i = 0; i < 24; i++)
+                        {
+                            if (cpu->freeiq[i] == 0)
+                            {
+                                iq_entry = &cpu->IssueQueue[i];
+                                cpu->freeiq[i] = 1;
+                                break;
+                            }
+                        }
+                        iq_entry->opcode = cpu->decode.opcode;
+                        strcpy(iq_entry->opcode_str, cpu->decode.opcode_str);
+                        iq_entry->src1 = rs1_physical;
+                        iq_entry->src2 = rs2_physical;
+                        iq_entry->imm=cpu->decode.imm;
+                        iq_entry->pc = cpu->decode.pc;
+                        iq_entry->des_phy_reg = first_free_phy_reg;
+                        iq_entry->des_rd = cpu->decode.rd;
+                        iq_entry->rob_tail = cpu->rob_current_instruction;
+                        cpu->decode.has_insn = FALSE;
                     }
                     break;
                 }
@@ -773,11 +828,6 @@ APEX_memory2(APEX_CPU *cpu)
             //dest <- src1+src2
             // dest reg <- mem addr[memory_address]
             cpu->memory2.result_buffer = cpu->data_memory[cpu->memory2.memory_address];
-            //instruction reirenemt logic
-            //   cpu->phys_regs[selectedrobentry->des_phy_reg] = cpu->memory2.result_buffer;
-
-            //  //start
-            // ROB_ENTRY *rob_entry = &cpu->ROB[cpu->rob_tail];
             selectedrobentry->exception_codes = 0;
             selectedrobentry->result_valid = 1;
             selectedrobentry->result = cpu->memory2.result_buffer;
