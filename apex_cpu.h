@@ -65,11 +65,14 @@ typedef struct IQ_ENTRY
 	int src2;
 	int src2_tag;
 	int src2_ready;
+
+    int src3;
 	int imm;
     int finishedstage;
     int des_phy_reg;
 
 	int fu_type;
+    int rob_tail;
 	
     int des_rd;
 } IQ_ENTRY;
@@ -155,7 +158,7 @@ typedef struct APEX_CPU
     CPU_Stage memory1 ;
     CPU_Stage memory2 ;
     IQ_ENTRY iq_entry;
-
+    CPU_Stage instruction_commitment ;
 } APEX_CPU;
 
 APEX_Instruction *create_code_memory(const char *filename, int *size);
@@ -163,4 +166,5 @@ APEX_CPU *APEX_cpu_init(const char *filename);
 void APEX_cpu_run(APEX_CPU *cpu);
 void APEX_cpu_stop(APEX_CPU *cpu);
 void instruction_retirement(APEX_CPU *cpu,IQ_ENTRY iq_entry);
+void instruction_retirement_intfu(APEX_CPU *cpu, int result_buffer, int des_rd, int des_phy_reg );
 #endif
