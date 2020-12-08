@@ -14,7 +14,7 @@
 #include "apex_macros.h"
 int funct = 0; // 0 for simulate 1 for display and single step for 2
 int numOfCycles = 0;
-int ENABLE_DEBUG_MESSAGES=TRUE;
+int ENABLE_DEBUG_MESSAGES = TRUE;
 /* Converts the PC(4000 series) into array index for code memory
  *
  * Note: You are not supposed to edit this function
@@ -128,10 +128,11 @@ print_instruction(const CPU_Stage *stage)
 static void
 print_stage_content(const char *name, const CPU_Stage *stage)
 {
-    if(funct !=0){
-    printf("%-15s: pc(%d) ", name, stage->pc);
-    print_instruction(stage);
-    printf("\n");
+    if (funct != 0)
+    {
+        printf("%-15s: pc(%d) ", name, stage->pc);
+        print_instruction(stage);
+        printf("\n");
     }
 }
 static void printdatamemory(APEX_CPU *cpu)
@@ -217,11 +218,13 @@ static void print_physical_register(APEX_CPU *cpu)
 
     printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
     printf("Details of Valid Physical register State --\n");
+     printf(" P[#]  ==== [valid] ----- [value]\n  " );
     for (int i = 0; i < 48; i++)
     {
-        if (cpu->free_PR_list[i] == 1)
+        // if (cpu->free_PR_list[i] == 1)
         {
-            printf(" P[%d]  ==== [%d] \n  ", i, cpu->phys_regs[i]);
+
+            printf(" P[%d]  ==== [%d] ----- [%d]\n  ", i, cpu->phys_regs_valid[i],cpu->phys_regs[i]);
         }
     }
 }
@@ -321,11 +324,7 @@ APEX_decode(APEX_CPU *cpu)
                 rob_entry->des_phy_reg = -1;
                 cpu->rob_tail = (cpu->rob_tail + 1) % 64;
                 //rob end
-                if (ENABLE_DEBUG_MESSAGES)
-                {
-                    print_stage_content("Instruction at decode____________Stage--->", &cpu->decode);
-                }
-                return;
+
             }
             else if (cpu->decode.opcode == OPCODE_BZ || cpu->decode.opcode == OPCODE_BNZ)
             {
@@ -393,35 +392,41 @@ APEX_decode(APEX_CPU *cpu)
             }
             else
             {
-                int first_free_phy_reg = -1;
 
                 int rs1_physical = cpu->decode.rs1 > -1 ? cpu->rename_table[cpu->decode.rs1] : -1;
                 int rs2_physical = cpu->decode.rs2 > -1 ? cpu->rename_table[cpu->decode.rs2] : -1;
                 int rs3_physical = -1;
+                int first_free_phy_reg;
                 if (cpu->decode.opcode == OPCODE_STR)
                     rs3_physical = cpu->decode.rs3 > -1 ? cpu->rename_table[cpu->decode.rs3] : -1;
 
-                for (int i = 0; i < 48; i++)
+                if ((cpu->decode.opcode == OPCODE_ADD) || (cpu->decode.opcode == OPCODE_ADDL) || (cpu->decode.opcode == OPCODE_AND) || (cpu->decode.opcode == OPCODE_MUL) || (cpu->decode.opcode == OPCODE_DIV) || (cpu->decode.opcode == OPCODE_OR) || (cpu->decode.opcode == OPCODE_JAL) || (cpu->decode.opcode == OPCODE_SUB) || (cpu->decode.opcode == OPCODE_JUMP) || (cpu->decode.opcode == OPCODE_MOVC) || (cpu->decode.opcode == OPCODE_SUBL) || (cpu->decode.opcode == OPCODE_LOAD) || (cpu->decode.opcode == OPCODE_XOR))
                 {
-                    if (cpu->free_PR_list[i] == 0)
-                    {
-                        first_free_phy_reg = i;
-                        cpu->free_PR_list[i] = 1;
-                        cpu->phys_regs_valid[i] = 1;
-                        break;
-                    }
-                }
+                    first_free_phy_reg = -1;
 
-                if (first_free_phy_reg > -1)
-                {
-                    cpu->rename_table[cpu->decode.rd] = first_free_phy_reg;
-                    //add a rename table entry made rename table contents as invalid
-                    cpu->rename_table_valid[cpu->decode.rd] = 0;
-                    cpu->phys_regs_valid[cpu->rename_table[cpu->decode.rd]] = 0;
-                }
-                if (!(first_free_phy_reg > -1))
-                {
-                    stagestalled = 1;
+                    for (int i = 0; i < 48; i++)
+                    {
+                        if (cpu->free_PR_list[i] == 0)
+                        {
+                            first_free_phy_reg = i;
+                            cpu->free_PR_list[i] = 1;
+                            break;
+                        }
+                    }
+
+                    if (first_free_phy_reg > -1)
+                    {
+                        cpu->rename_table[cpu->decode.rd] = first_free_phy_reg;
+                        //add a rename table entry made rename table contents as invalid
+                        cpu->rename_table_valid[cpu->decode.rd] = 1;
+
+                        cpu->phys_regs_valid[first_free_phy_reg] = 0;
+                    }
+
+                    if (!(first_free_phy_reg > -1))
+                    {
+                        stagestalled = 1;
+                    }
                 }
                 int i = 0;
                 for (i = 0; i < 24; i++)
@@ -1525,7 +1530,7 @@ int APEX_jbu2(APEX_CPU *cpu)
             //start
             ROB_ENTRY *rob_entry = &cpu->ROB[iq_entry.rob_tail];
             cpu->jbu2.result_buffer = cpu->phys_regs[iq_entry.src1] + iq_entry.imm;
-            
+
             rob_entry->exception_codes = 0;
             rob_entry->result_valid = 1;
             rob_entry->result = cpu->jbu2.result_buffer;
@@ -1618,8 +1623,7 @@ int APEX_instruction_commitment(APEX_CPU *cpu)
             {
                 cpu->rob_head = 0;
                 cpu->rob_tail = 0;
-            memset(cpu->ROB, 0, sizeof(int) * 64);
-   
+                memset(cpu->ROB, 0, sizeof(int) * 64);
             }
             else
             {
@@ -1632,8 +1636,7 @@ int APEX_instruction_commitment(APEX_CPU *cpu)
             {
                 cpu->rob_head = 0;
                 cpu->rob_tail = 0;
-            memset(cpu->ROB, 0, sizeof(int) * 64);
-   
+                memset(cpu->ROB, 0, sizeof(int) * 64);
             }
             else
             {
@@ -1646,14 +1649,13 @@ int APEX_instruction_commitment(APEX_CPU *cpu)
             cpu->rob_head = 0;
             cpu->rob_tail = 0;
             memset(cpu->ROB, 0, sizeof(int) * 64);
-   
         }
         else if (selectedrobentry->result_valid && selectedrobentry->instruction_type == OPCODE_JUMP)
         {
             cpu->rob_head = 0;
             cpu->rob_tail = 0;
             memset(cpu->ROB, 0, sizeof(int) * 64);
-   
+
             break;
         }
 
@@ -1667,6 +1669,7 @@ int APEX_instruction_commitment(APEX_CPU *cpu)
         }
         if (selectedrobentry->instruction_type == OPCODE_HALT)
         {
+
             return TRUE;
         }
         selectedrobentry = &cpu->ROB[cpu->rob_head];
@@ -1759,7 +1762,7 @@ void APEX_cpu_run(APEX_CPU *cpu, const char *fun, const char *steps)
     //int funct=0; // 0 for simulate 1 for display and single step for 2
     if (strcmp(fun, "simulate") == 0)
     {
-        ENABLE_DEBUG_MESSAGES=FALSE;
+        ENABLE_DEBUG_MESSAGES = FALSE;
         funct = 0;
         numOfCycles = atoi(steps);
     }
@@ -1794,15 +1797,17 @@ void APEX_cpu_run(APEX_CPU *cpu, const char *fun, const char *steps)
         APEX_mul3(cpu);
         APEX_mul2(cpu);
         APEX_mul1(cpu);
-        if (APEX_intfu(cpu))
-        {
-            // breaktrue = 1;
-        }
-        //APEX_ROB(cpu);
+        APEX_intfu(cpu);
         APEX_issuequeue(cpu);
         APEX_decode(cpu);
         APEX_fetch(cpu);
 
+        if (breaktrue) {
+
+            for(int i=0;i <16;i++) {
+                cpu->rename_table[i]=cpu->r_rename_table[i];
+            }
+        }
         //  print_reg_file(cpu);
         if (funct != 0)
         {
@@ -1828,7 +1833,7 @@ void APEX_cpu_run(APEX_CPU *cpu, const char *fun, const char *steps)
         }
 
         cpu->clock++;
-        if (funct != 2 && numOfCycles == cpu->clock ) 
+        if (funct != 2 && numOfCycles == cpu->clock)
         {
             if (funct == 0)
             {
@@ -1845,22 +1850,25 @@ void APEX_cpu_run(APEX_CPU *cpu, const char *fun, const char *steps)
         }
         if (breaktrue)
         {
+
+
             if (funct != 2)
             {
 
-            if (funct == 0)
-            {
-                print_rob(cpu);
-                print_rename_table(cpu);
-                print_r_rename_table(cpu);
-            }
+                if (funct == 0)
+                {
+                    print_rob(cpu);
+                    print_rename_table(cpu);
+                    print_r_rename_table(cpu);
+                }
                 printdatamemory(cpu);
                 if (TRUE)
                 {
                     print_physical_register(cpu);
                 }
             }
-            if(funct == 2){
+            if (funct == 2)
+            {
                 print_physical_register(cpu);
             }
             break;
@@ -1869,7 +1877,8 @@ void APEX_cpu_run(APEX_CPU *cpu, const char *fun, const char *steps)
 }
 void instruction_retirement_intfu(APEX_CPU *cpu, int result_buffer, int des_rd, int des_phy_reg)
 {
-    if (cpu->r_rename_table[des_rd] == 0 || cpu->r_rename_table[des_rd] == -1)
+
+    if (cpu->rename_table[des_rd] == cpu->r_rename_table[des_rd])
     {
 
         //instruction retriement process
@@ -1878,9 +1887,6 @@ void instruction_retirement_intfu(APEX_CPU *cpu, int result_buffer, int des_rd, 
         cpu->phys_regs[des_phy_reg] = result_buffer;
         //the phy is valid now
         cpu->phys_regs_valid[des_phy_reg] = 1;
-
-        //rat update content is valid
-        cpu->rename_table_valid[des_rd] = 1;
 
         //the r-rat entry is of rd is pointing to most recent phy_reg
         cpu->r_rename_table[des_rd] = des_phy_reg;
@@ -1899,48 +1905,10 @@ void instruction_retirement_intfu(APEX_CPU *cpu, int result_buffer, int des_rd, 
         //the phy is valid now
         cpu->phys_regs_valid[des_phy_reg] = 1;
         //rat update content is valid
-        cpu->rename_table_valid[des_rd] = 1;
+
         //the r-rat entry is of rd is pointing to most recent phy_reg
         cpu->r_rename_table[des_rd] = des_phy_reg;
         cpu->r_rename_table_valid[des_rd] = 1;
-    }
-}
-void instruction_retirement(APEX_CPU *cpu, IQ_ENTRY iq_entry)
-{
-    if (cpu->r_rename_table[iq_entry.des_rd] == 0 || cpu->r_rename_table[iq_entry.des_rd] == -1)
-    {
-
-        //instruction retriement process
-        //iq_entry.des_phy_reg ==freed entry
-
-        cpu->phys_regs[iq_entry.des_phy_reg] = cpu->intfu.result_buffer;
-        //the phy is valid now
-        cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
-
-        //rat update content is valid
-        cpu->rename_table_valid[iq_entry.des_rd] = 1;
-
-        //the r-rat entry is of rd is pointing to most recent phy_reg
-        cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
-        cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
-    }
-    else
-    {
-        int previous_rat_index = cpu->r_rename_table[iq_entry.des_rd];
-        //the phy is invalid now
-        cpu->phys_regs_valid[previous_rat_index] = 0;
-        //free physical register
-        //mark contents has  free
-        cpu->free_PR_list[previous_rat_index] = 0;
-
-        cpu->phys_regs[iq_entry.des_phy_reg] = cpu->intfu.result_buffer;
-        //the phy is valid now
-        cpu->phys_regs_valid[iq_entry.des_phy_reg] = 1;
-        //rat update content is valid
-        cpu->rename_table_valid[iq_entry.des_rd] = 1;
-        //the r-rat entry is of rd is pointing to most recent phy_reg
-        cpu->r_rename_table[iq_entry.des_rd] = iq_entry.des_phy_reg;
-        cpu->r_rename_table_valid[iq_entry.des_rd] = 1;
     }
 }
 
