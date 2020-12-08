@@ -1106,6 +1106,14 @@ APEX_intfu(APEX_CPU *cpu)
         case OPCODE_ADD:
         {
             cpu->intfu.result_buffer = cpu->phys_regs[iq_entry.src1] + cpu->phys_regs[iq_entry.src2];
+            if (cpu->intfu.result_buffer == 0)
+            {
+                cpu->zero_flag = TRUE;
+            }
+            else
+            {
+                cpu->zero_flag = FALSE;
+            }
             //start
             ROB_ENTRY *rob_entry = &cpu->ROB[iq_entry.rob_tail];
             rob_entry->exception_codes = 0;
@@ -1385,7 +1393,7 @@ int APEX_jbu1(APEX_CPU *cpu)
             // cpu->jbu1.result_buffer = iq_entry.src1 + iq_entry.imm;
             cpu->jbu1.result_buffer = cpu->phys_regs[iq_entry.src1] + iq_entry.imm;
             cpu->jbu1.rd = iq_entry.pc + 4;
-            cpu->decode.has_insn = TRUE;
+            cpu->decode.has_insn = FALSE;
             cpu->fetch.has_insn = FALSE;
             for (int i = 0; i < 24; i++)
             {
@@ -1396,7 +1404,7 @@ int APEX_jbu1(APEX_CPU *cpu)
         case OPCODE_JUMP:
         {
             cpu->jbu1.result_buffer = cpu->phys_regs[iq_entry.src1] + iq_entry.imm;
-            cpu->decode.has_insn = TRUE;
+            cpu->decode.has_insn = FALSE;
             cpu->fetch.has_insn = FALSE;
             for (int i = 0; i < 24; i++)
             {
@@ -1409,7 +1417,7 @@ int APEX_jbu1(APEX_CPU *cpu)
             if (cpu->zero_flag == TRUE)
             {
                 cpu->jbu1.result_buffer = iq_entry.pc + iq_entry.imm;
-                cpu->decode.has_insn = TRUE;
+                cpu->decode.has_insn = FALSE;
                 cpu->fetch.has_insn = FALSE;
                 for (int i = 0; i < 24; i++)
                 {
@@ -1424,7 +1432,7 @@ int APEX_jbu1(APEX_CPU *cpu)
             if (cpu->zero_flag == FALSE)
             {
                 cpu->jbu1.result_buffer = iq_entry.pc + iq_entry.imm;
-                cpu->decode.has_insn = TRUE;
+                cpu->decode.has_insn = FALSE;
                 cpu->fetch.has_insn = FALSE;
                 for (int i = 0; i < 24; i++)
                 {
@@ -1516,6 +1524,8 @@ int APEX_jbu2(APEX_CPU *cpu)
         {
             //start
             ROB_ENTRY *rob_entry = &cpu->ROB[iq_entry.rob_tail];
+            cpu->jbu2.result_buffer = cpu->phys_regs[iq_entry.src1] + iq_entry.imm;
+            
             rob_entry->exception_codes = 0;
             rob_entry->result_valid = 1;
             rob_entry->result = cpu->jbu2.result_buffer;
@@ -1543,6 +1553,8 @@ int APEX_jbu2(APEX_CPU *cpu)
             ROB_ENTRY *rob_entry = &cpu->ROB[iq_entry.rob_tail];
             rob_entry->exception_codes = 0;
             rob_entry->result_valid = 1;
+
+            cpu->jbu2.result_buffer = cpu->phys_regs[iq_entry.src1] + iq_entry.imm;
             rob_entry->result = cpu->jbu2.result_buffer;
             rob_entry->des_phy_reg = iq_entry.des_phy_reg;
             rob_entry->des_rd = iq_entry.des_rd;
@@ -1606,6 +1618,8 @@ int APEX_instruction_commitment(APEX_CPU *cpu)
             {
                 cpu->rob_head = 0;
                 cpu->rob_tail = 0;
+            memset(cpu->ROB, 0, sizeof(int) * 64);
+   
             }
             else
             {
@@ -1618,6 +1632,8 @@ int APEX_instruction_commitment(APEX_CPU *cpu)
             {
                 cpu->rob_head = 0;
                 cpu->rob_tail = 0;
+            memset(cpu->ROB, 0, sizeof(int) * 64);
+   
             }
             else
             {
@@ -1629,11 +1645,15 @@ int APEX_instruction_commitment(APEX_CPU *cpu)
             instruction_retirement_intfu(cpu, selectedrobentry->imm, selectedrobentry->des_rd, selectedrobentry->des_phy_reg);
             cpu->rob_head = 0;
             cpu->rob_tail = 0;
+            memset(cpu->ROB, 0, sizeof(int) * 64);
+   
         }
         else if (selectedrobentry->result_valid && selectedrobentry->instruction_type == OPCODE_JUMP)
         {
             cpu->rob_head = 0;
             cpu->rob_tail = 0;
+            memset(cpu->ROB, 0, sizeof(int) * 64);
+   
             break;
         }
 
