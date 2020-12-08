@@ -163,7 +163,7 @@ typedef struct APEX_CPU
 
 APEX_Instruction *create_code_memory(const char *filename, int *size);
 APEX_CPU *APEX_cpu_init(const char *filename);
-void APEX_cpu_run(APEX_CPU *cpu);
+void APEX_cpu_run(APEX_CPU *cpu,const char *fun,const char *steps);
 void APEX_cpu_stop(APEX_CPU *cpu);
 void instruction_retirement(APEX_CPU *cpu,IQ_ENTRY iq_entry);
 void instruction_retirement_intfu(APEX_CPU *cpu, int result_buffer, int des_rd, int des_phy_reg );

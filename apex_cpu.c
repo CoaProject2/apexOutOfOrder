@@ -12,7 +12,9 @@
 
 #include "apex_cpu.h"
 #include "apex_macros.h"
-
+int funct = 0; // 0 for simulate 1 for display and single step for 2
+int numOfCycles = 0;
+int ENABLE_DEBUG_MESSAGES=TRUE;
 /* Converts the PC(4000 series) into array index for code memory
  *
  * Note: You are not supposed to edit this function
@@ -126,9 +128,11 @@ print_instruction(const CPU_Stage *stage)
 static void
 print_stage_content(const char *name, const CPU_Stage *stage)
 {
+    if(funct !=0){
     printf("%-15s: pc(%d) ", name, stage->pc);
     print_instruction(stage);
     printf("\n");
+    }
 }
 static void printdatamemory(APEX_CPU *cpu)
 {
@@ -212,7 +216,7 @@ static void print_physical_register(APEX_CPU *cpu)
 {
 
     printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
-    printf("Details of Physical register State --\n");
+    printf("Details of Valid Physical register State --\n");
     for (int i = 0; i < 48; i++)
     {
         if (cpu->free_PR_list[i] == 1)
@@ -385,7 +389,6 @@ APEX_decode(APEX_CPU *cpu)
 
                     iq_entry->fu_type = 5;
                     cpu->decode.has_insn = FALSE;
-
                 }
             }
             else
@@ -1471,6 +1474,7 @@ int APEX_jbu2(APEX_CPU *cpu)
             { // DO IN ROB
                 //cpu->pc = cpu->jbu2.result_buffer;
                 //cpu->is_stalled = 0; // 1 means stalled
+                cpu->jbu2.result_buffer = iq_entry.pc + iq_entry.imm;
                 cpu->decode.has_insn = FALSE;
                 cpu->pc = cpu->jbu2.result_buffer;
 
@@ -1496,6 +1500,7 @@ int APEX_jbu2(APEX_CPU *cpu)
             { // DO IN ROB
                 //cpu->pc = cpu->jbu2.result_buffer;
                 //cpu->is_stalled = 0; // 1 means stalled
+                cpu->jbu2.result_buffer = cpu->jbu2.iq_entry.pc + cpu->jbu2.iq_entry.imm;
                 cpu->decode.has_insn = FALSE;
                 cpu->pc = cpu->jbu2.result_buffer;
 
@@ -1518,15 +1523,15 @@ int APEX_jbu2(APEX_CPU *cpu)
             rob_entry->des_rd = iq_entry.des_rd;
 
             rob_entry->imm = cpu->jbu2.rd; // one addition to pass commit function
-            
-                cpu->decode.has_insn = FALSE;
-                cpu->pc = cpu->jbu2.result_buffer;
 
-                cpu->fetch.has_insn = TRUE;
-                for (int i = 0; i < 24; i++)
-                {
-                    cpu->freeiq[i] = 0;
-                }
+            cpu->decode.has_insn = FALSE;
+            cpu->pc = cpu->jbu2.result_buffer;
+
+            cpu->fetch.has_insn = TRUE;
+            for (int i = 0; i < 24; i++)
+            {
+                cpu->freeiq[i] = 0;
+            }
             //end
 
             break;
@@ -1602,9 +1607,10 @@ int APEX_instruction_commitment(APEX_CPU *cpu)
                 cpu->rob_head = 0;
                 cpu->rob_tail = 0;
             }
-            else{
+            else
+            {
                 cpu->rob_head = (cpu->rob_head + 1) % 64;
-        }
+            }
         }
         else if (selectedrobentry->result_valid && (selectedrobentry->instruction_type == OPCODE_BNZ))
         {
@@ -1613,9 +1619,11 @@ int APEX_instruction_commitment(APEX_CPU *cpu)
                 cpu->rob_head = 0;
                 cpu->rob_tail = 0;
             }
-            else{
-            cpu->rob_head = (cpu->rob_head + 1) % 64;
-        }}
+            else
+            {
+                cpu->rob_head = (cpu->rob_head + 1) % 64;
+            }
+        }
         else if (selectedrobentry->result_valid && selectedrobentry->instruction_type == OPCODE_JAL)
         {
             instruction_retirement_intfu(cpu, selectedrobentry->imm, selectedrobentry->des_rd, selectedrobentry->des_phy_reg);
@@ -1725,9 +1733,25 @@ APEX_cpu_init(const char *filename)
  *
  * Note: You are free to edit this function according to your implementation
  */
-void APEX_cpu_run(APEX_CPU *cpu)
+void APEX_cpu_run(APEX_CPU *cpu, const char *fun, const char *steps)
 {
     char user_prompt_val;
+    //int funct=0; // 0 for simulate 1 for display and single step for 2
+    if (strcmp(fun, "simulate") == 0)
+    {
+        ENABLE_DEBUG_MESSAGES=FALSE;
+        funct = 0;
+        numOfCycles = atoi(steps);
+    }
+    else if (strcmp(fun, "display") == 0)
+    {
+        funct = 1;
+        numOfCycles = atoi(steps);
+    }
+    else if (strcmp(fun, "single_step") == 0)
+    {
+        funct = 2;
+    }
 
     while (TRUE)
     {
@@ -1738,7 +1762,7 @@ void APEX_cpu_run(APEX_CPU *cpu)
             printf("Clock Cycle #: %d\n", cpu->clock + 1);
             printf("--------------------------------------------\n");
         }
-        
+
         if (APEX_instruction_commitment(cpu))
         {
             breaktrue = 1;
@@ -1758,17 +1782,20 @@ void APEX_cpu_run(APEX_CPU *cpu)
         APEX_issuequeue(cpu);
         APEX_decode(cpu);
         APEX_fetch(cpu);
-        
+
         //  print_reg_file(cpu);
-        print_rob(cpu);
-        print_rename_table(cpu);
-        print_r_rename_table(cpu);
-        printdatamemory(cpu);
-        if (FALSE)
+        if (funct != 0)
         {
-            print_physical_register(cpu);
+            print_rob(cpu);
+            print_rename_table(cpu);
+            print_r_rename_table(cpu);
+            //printdatamemory(cpu);
+            if (FALSE)
+            {
+                print_physical_register(cpu);
+            }
         }
-        if (cpu->single_step)
+        if (funct == 2 && cpu->single_step)
         {
             printf("Press any key to advance CPU Clock or <q> to quit:\n");
             scanf("%c", &user_prompt_val);
@@ -1781,8 +1808,41 @@ void APEX_cpu_run(APEX_CPU *cpu)
         }
 
         cpu->clock++;
+        if (funct != 2 && numOfCycles == cpu->clock ) 
+        {
+            if (funct == 0)
+            {
+                print_rob(cpu);
+                print_rename_table(cpu);
+                print_r_rename_table(cpu);
+            }
+            printdatamemory(cpu);
+            if (TRUE)
+            {
+                print_physical_register(cpu);
+            }
+            break;
+        }
         if (breaktrue)
         {
+            if (funct != 2)
+            {
+
+            if (funct == 0)
+            {
+                print_rob(cpu);
+                print_rename_table(cpu);
+                print_r_rename_table(cpu);
+            }
+                printdatamemory(cpu);
+                if (TRUE)
+                {
+                    print_physical_register(cpu);
+                }
+            }
+            if(funct == 2){
+                print_physical_register(cpu);
+            }
             break;
         }
     }
