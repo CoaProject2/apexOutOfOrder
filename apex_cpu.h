@@ -142,7 +142,6 @@ typedef struct APEX_CPU
     int r_rename_table_valid[16];
     IQ_ENTRY IssueQueue[24];
   
-  
     int freeiq[24];
     /* Pipeline stages */
     CPU_Stage fetch;
