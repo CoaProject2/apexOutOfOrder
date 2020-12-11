@@ -133,7 +133,7 @@ typedef struct APEX_CPU
     int rob_head;
     int rob_current_instruction;
    
-
+    int iqsize;
 	//Rename table to contain info with Index represents the  Physical Register.
 	int rename_table[16];
     int rename_table_valid[16];
